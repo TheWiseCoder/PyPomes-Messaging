@@ -1,0 +1,11 @@
+.cache
+.idea
+.env
+temp
+tmp
+**/__pycache__
+/dist
+/env
+.vscode
+*.py[cod]
+deploy.txt
