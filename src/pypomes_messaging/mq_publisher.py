@@ -1,11 +1,11 @@
-from typing import Any, Final
-from pika.channel import Channel
-from pika.connection import Connection
-from pika.exchange_type import ExchangeType
-import logging
 import pika
 import pika.frame as pika_frame
 import threading
+from logging import Logger
+from typing import Final
+from pika.channel import Channel
+from pika.connection import Connection
+from pika.exchange_type import ExchangeType
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -33,84 +33,66 @@ class _MqPublisher(threading.Thread):
     This implementation uses delivery confirmation, by providing a means to follow up
     on message delivery, and verify if such deliveries were confirme by *RabbitMQ*.
     """
-    # instance attributes
-    started_publishing: bool
-    mq_url: str
-    exchange_name: str
-    exchange_type: ExchangeType | str
-    stopped: bool
-    acked: int
-    nacked: int
-    msg_last_filed: int
-    msg_last_sent: int
-    logger: logging.Logger
-    publish_interval: int
-    reconnect_delay: int
-    max_reconnect_delay: int
-    channel: Channel | None
-    state: int
-    state_msg: str
-
-    # structure ('n' is the sequential message number, int > 0):
-    # <{ n: { "header": <str>,
-    #        "body":  <bytes>,    # noqa: ERA001
-    #        "mimetype": <str>,   # noqa: ERA001
-    #        "routing_key": <str>
-    #      },...
-    # }>
-    messages: dict | None
-
-    # 'Any', instead of 'None', prevents the alert "Cannot find reference 'ioloop' in 'Connection'"
-    conn: Connection | Any
-
-    # mutex for controlling concurrent access to the message structure
-    msg_lock: threading.Lock
 
     def __init__(self, mq_url: str, exchange_name: str, exchange_type: str,
-                 max_reconnect_delay: int, logger: logging.Logger = None) -> None:
+                 max_reconnect_delay: int, logger: Logger = None) -> None:
         """
-        Create a new instance of the publisher, with the necessary arguments to allow it to interact with*RabbitMQ*.
+        Create a new instance of the publisher, with the arguments to allow it to interact with *RabbitMQ*.
 
         :param mq_url: A URL usada for the connection
         :param exchange_name: name of the exchange to use
         :param exchange_type: type of the exchange
         :param max_reconnect_delay: maximum delay for re-establishing lost connections, in soeconds
-        :param logger: optional logger for operations logging
+        :param logger: optional logger
         """
         threading.Thread.__init__(self)
 
-        self.state = MQP_INITIALIZING
-        self.state_msg = "Attenpting to instantiate the publisher"
-        self.mq_url = mq_url
-        self.logger = logger
-        self.exchange_name = exchange_name
-
+        exch_type: ExchangeType | str
         match exchange_type:
             case "direct":
-                self.exchange_type = ExchangeType.direct
+                exch_type = ExchangeType.direct
             case "fanout":
-                self.exchange_type = ExchangeType.fanout
+                exch_type = ExchangeType.fanout
             case "headers":
-                self.exchange_type = ExchangeType.headers
+                exch_type = ExchangeType.headers
             case _:  # 'topic'
-                self.exchange_type = ExchangeType.topic
+                exch_type = ExchangeType.topic
 
-        self.started_publishing = False
-        self.conn = None
-        self.channel = None
-        self.stopped = False
+        # initialize instance attributes
+        self.exchange_name: str = exchange_name
+        self.exchange_type: ExchangeType = exch_type
 
-        self.acked = 0
-        self.nacked = 0
-        self.msg_last_filed = 0
-        self.msg_last_sent = 0
-        self.publish_interval = 1
-        self.reconnect_delay = 0
-        self.max_reconnect_delay = max_reconnect_delay
+        self.started_publishing: bool = False
+        self.mq_url: str = mq_url
+        self.stopped: bool = False
+        self.acked: int = 0
+        self.nacked: int = 0
+        self.msg_last_filed: int = 0
+        self.msg_last_sent: int = 0
+        self.logger: Logger = logger
+        self.publish_interval: int = 1
+
+        self.reconnect_delay: int = 0
+        self.max_reconnect_delay: int = max_reconnect_delay
+
+        self.conn: Connection | None = None
+        self.channel: Channel | None = None
+
+        self.state: int = MQP_INITIALIZING
+        self.state_msg: str = "Attenpting to instantiate the publisher"
+
+        # structure ('n' is the sequential message number, int > 0):
+        # <{ n: { "header": <str>,
+        #        "body":  <bytes>,    # noqa: ERA001
+        #        "mimetype": <str>,   # noqa: ERA001
+        #        "routing_key": <str>
+        #      },...
+        # }>
+        self.messages: dict | None = None
 
         self.messages = None
-        # inicializa mutex
-        self.msg_lock = threading.Lock()
+        # mutex for controlling concurrent access to the message structure
+        self.msg_lock: threading.Lock = threading.Lock()
 
         if self.logger is not None:
             self.logger.info("Publisher instantiated, with exchange "

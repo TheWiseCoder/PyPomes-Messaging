@@ -1,13 +1,13 @@
-from typing import Any, Final
+import time
+import threading
+from logging import Logger
+from typing import Final
 from pika import frame as pika_frame
 from pika import spec as pika_spec
 from pika import SelectConnection, URLParameters
 from pika.channel import Channel
 from pika.connection import Connection
 from pika.exchange_type import ExchangeType
-import logging
-import time
-import threading
 
 MQS_CONNECTION_OPEN: Final[int] = 1
 MQS_CONNECTION_CLOSED: Final[int] = 2
@@ -27,28 +27,9 @@ class _MqSubscriber:
     closed are limited, and are often tied to permissions-related issues, or to socket timeouts.
     If the channel is closed, it indicates a problem with one of the commands that were issued.
     """
-    # instance attributes
-    should_reconnect: bool
-    started_consumption: bool
-    mq_url: str
-    exchange_name: str
-    exchange_type: ExchangeType | str
-    queue_name: str
-    msg_target: callable
-    logger: logging.Logger
-    closing: bool
-    consuming: bool
-    prefetch_count: int
-    consumer_tag: str | None
-    channel: Channel | None
-    state: int
-    state_msg: str
-
-    # 'Any', instead 'None', prevents the alert "Cannot find reference 'ioloop' in 'Connection'"
-    conn: Connection | Any
 
     def __init__(self, mq_url: str, exchange_name: str, exchange_type: str,
-                 queue_name: str, msg_target: callable, logger: logging.Logger = None) -> None:
+                 queue_name: str, msg_target: callable, logger: Logger = None) -> None:
         """
         Create an instance of the consumer, witth the arguments need for interacting with *RabbitMQ*.
 
@@ -59,36 +40,39 @@ class _MqSubscriber:
         :param msg_target: callback for message deliveries
         :param logger: optional logger for operations logging
         """
-        self.state = MQS_INITIALIZING
-        self.state_msg = "Attenpting to initialize the subscriber"
-        self.mq_url = mq_url
-        self.msg_target = msg_target
-        self.logger = logger
-
-        self.exchange_name = exchange_name
+        exch_type:  ExchangeType
         match exchange_type:
             case "direct":
-                self.exchange_type = ExchangeType.direct
+                exch_type = ExchangeType.direct
             case "fanout":
-                self.exchange_type = ExchangeType.fanout
+                exch_type = ExchangeType.fanout
             case "headers":
-                self.exchange_type = ExchangeType.headers
+                exch_type = ExchangeType.headers
             case _:  # 'topic'
-                self.exchange_type = ExchangeType.topic
+                exch_type = ExchangeType.topic
 
-        self.queue_name = queue_name
+        # initialize instance attributes
+        self.exchange_name = exchange_name
+        self.exchange_type: ExchangeType = exch_type
 
-        self.started_consumption = False
-        self.should_reconnect = False
-        self.consuming = False
-        self.closing = False
+        self.should_reconnect: bool = False
+        self.started_consumption: bool = False
+        self.logger: Logger = logger
+        self.closing: bool = False
+        self.consuming: bool = False
+        self.consumer_tag: str | None = None
+        self.mq_url: str = mq_url
+        self.msg_target: callable = msg_target
 
-        self.conn = None
-        self.channel = None
-        self.consumer_tag = None
+        self.state: int = MQS_INITIALIZING
+        self.state_msg: str = "Attenpting to initialize the subscriber"
+
+        self.conn: Connection | None = None
+        self.channel: Channel | None = None
+        self.queue_name: str = queue_name
 
         # parameter for channel QOS - for higher yield in production, try higher values
-        self.prefetch_count = 1
+        self.prefetch_count: int = 1
 
         if self.logger is not None:
             self.logger.info("Instantiated, with exchange "
@@ -451,36 +435,26 @@ class _MqSubscriberMaster(threading.Thread):
 
     This reconnection is carried out if the consumer indicates that reconnecting is necessary.
     """
-    # instance attributes
-    consumer: _MqSubscriber | None
-    mq_url: str
-    msg_target: callable
-    exchange_name: str
-    exchange_type: str
-    logger: logging.Logger
-    queue_name: str
-    reconnect_delay: int
-    max_reconnect_delay: int
-    stopped: bool
 
     def __init__(self, mq_url: str, exchange_name: str, exchange_type: str, queue_name: str,
-                 msg_target: callable, max_reconnect_delay: int, logger: logging.Logger = None) -> None:
+                 msg_target: callable, max_reconnect_delay: int, logger: Logger = None) -> None:
 
         threading.Thread.__init__(self)
 
-        self.mq_url = mq_url
-        self.msg_target = msg_target
-        self.queue_name = queue_name
+        # initialize instance attributes
+        self.mq_url: str = mq_url
+        self.msg_target: callable = msg_target
+        self.queue_name: str = queue_name
         self.exchange_name = exchange_name
-        self.exchange_type = exchange_type
-        self.logger = logger
+        self.exchange_type: str = exchange_type
+        self.logger: Logger = logger
         self.reconnect_delay = 0
-        self.max_reconnect_delay = max_reconnect_delay
-        self.stopped = False
+        self.max_reconnect_delay: int = max_reconnect_delay
+        self.stopped: bool = False
 
         # instantiate the consumer
-        self.consumer = _MqSubscriber(self.mq_url, self.exchange_name, self.exchange_type,
-                                      self.queue_name, self.msg_target, self.logger)
+        self.consumer: _MqSubscriber = _MqSubscriber(self.mq_url, self.exchange_name, self.exchange_type,
+                                                     self.queue_name, self.msg_target, self.logger)
 
     def run(self) -> None:
         """
