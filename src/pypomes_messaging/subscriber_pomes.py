@@ -26,7 +26,7 @@ def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
                       max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
                       logger: logging.Logger = None, badge: str = None) -> bool:
     """
-    Create the threaded events subscriber.
+    Create the asynchronous subscriber.
 
     This is a wrapper around the package *Pika*, an implementation for a *RabbitMQ* client.
 
@@ -34,7 +34,7 @@ def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
     :param queue_name: queue to use
     :param msg_target: the callback to reach the messager cosumer
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
-    :param logger: optional logger object
+    :param logger: optional logger
     :param badge: optional badge identifying the publisher
     :return: True if the subscriber was created, or False otherwise
     """
@@ -66,7 +66,7 @@ def subscriber_destroy(badge: str = None) -> None:
     subscriber: _MqSubscriberMaster = __subscribers.get(curr_badge)
 
     # does the subscriber exist ?
-    if subscriber is not None:
+    if subscriber:
         # yes, stop and discard it
         subscriber.stop()
         __subscribers.pop(curr_badge)
@@ -86,15 +86,16 @@ def subscriber_start(errors: list[str], badge: str = None) -> bool:
     # retrieve the publisher
     subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
 
-    # proceed, if the subscriber was retrieved
-    if subscriber is not None:
+    # was the subscriber retrieved ?
+    if subscriber:
+        # yoes, proceed
         try:
             subscriber.start()
         except Exception as e:
             errors.append(f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
                           f"{exc_format(e, sys.exc_info())}")
 
-        # were there errors ?
+        # any errors ?
         if len(errors) == 0:
             # no, wait for the conclusion
             while subscriber.consumer.get_state() == MQS_INITIALIZING:
@@ -120,11 +121,12 @@ def subscriber_stop(errors: list[str], badge: str = None) -> bool:
     # initialize the return variable
     result: bool = False
 
-    # retrieve the publisher
+    # retrieve the subscriber
     subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if subscriber is not None:
+    # was the publisher retrieved ?
+    if subscriber:
+        # yes, proceed
         subscriber.stop()
         result = True
 
@@ -162,8 +164,9 @@ def subscriber_get_state(errors: list[str], badge: str = None) -> int:
     # retrieve the subscriber
     subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if subscriber is not None:
+    # was the subscriber retrieved ?
+    if subscriber:
+        # yes, proceed
         result = subscriber.consumer.get_state()
 
     return result
@@ -183,8 +186,9 @@ def subscriber_get_state_msg(errors: list[str], badge: str = None) -> str:
     # retrieve the subscriber
     subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if subscriber is not None:
+    # was the subscriber retrieved ?
+    if subscriber:
+        # yes, proceed
         result = subscriber.consumer.get_state_msg()
 
     return result

@@ -31,14 +31,14 @@ class _MqSubscriber:
     def __init__(self, mq_url: str, exchange_name: str, exchange_type: str,
                  queue_name: str, msg_target: callable, logger: Logger = None) -> None:
         """
-        Create an instance of the consumer, witth the arguments need for interacting with *RabbitMQ*.
+        Create an instance of the consumer, witth the arguments needed for interacting with *RabbitMQ*.
 
         :param mq_url: URL used in the connection
         :param exchange_name: name of the exchange to use
         :param exchange_type: type of the exchange
         :param queue_name: name of the message queue to use
         :param msg_target: callback for message deliveries
-        :param logger: optional logger for operations logging
+        :param logger: optional logger
         """
         exch_type:  ExchangeType
         match exchange_type:

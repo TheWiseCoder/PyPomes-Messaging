@@ -33,7 +33,7 @@ def publisher_create(errors: list[str], max_reconnect_delay: int = MQ_MAX_RECONN
     This is a wrapper around the package *Pika*, an implementation for a *RabbitMQ* client.
 
     :param errors: incidental errors
-    :param logger: optional logger object
+    :param logger: optional logger
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
     :param badge: optional badge identifying the publisher
     :return: True if the publisher was created, or False otherwise
@@ -44,7 +44,7 @@ def publisher_create(errors: list[str], max_reconnect_delay: int = MQ_MAX_RECONN
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
 
-    # has the scheduler been instantiated ?
+    # has the publisher been instantiated ?
     if __get_publisher(errors, curr_badge, False) is None:
         # no, instantiate it
         __publishers[curr_badge] = _MqPublisher(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
@@ -64,8 +64,8 @@ def publisher_destroy(badge: str = None) -> None:
     curr_badge: str = badge or __DEFAULT_BADGE
     publisher: _MqPublisher = __publishers.get(curr_badge)
 
-    # does the scheduler exist ?
-    if publisher is not None:
+    # does the publisher exist ?
+    if publisher:
         # yes, stop and discard it
         publisher.stop()
         __publishers.pop(curr_badge)
@@ -85,12 +85,13 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
     # retrieve the publisher
     publisher: _MqPublisher = __get_publisher(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if publisher is not None:
+    # was the publisher retrieved ?
+    if publisher:
+        # yes, proceed
         try:
             publisher.start()
         except Exception as e:
-            errors.append(f"Error starting the events publisher '{badge or __DEFAULT_BADGE}': "
+            errors.append(f"Error starting the publisher '{badge or __DEFAULT_BADGE}': "
                           f"{exc_format(e, sys.exc_info())}")
 
         # were there errors ?
@@ -102,7 +103,7 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
             # did connecting with the publisher fail ?
             if publisher.get_state() == MQP_CONNECTION_ERROR:
                 # yes, report the error
-                errors.append(f"Error starting the events publisher '{badge or __DEFAULT_BADGE}': "
+                errors.append(f"Error starting the publisher '{badge or __DEFAULT_BADGE}': "
                               f"{publisher.get_state_msg()}")
 
     return result
@@ -122,8 +123,9 @@ def publisher_stop(errors: list[str], badge: str = None) -> bool:
     # retrieve the publisher
     publisher: _MqPublisher = __get_publisher(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if publisher is not None:
+    # was the publisher retrieved ?
+    if publisher:
+        # yes, proceed
         publisher.stop()
         result = True
 
@@ -144,8 +146,9 @@ def publisher_get_state(errors: list[str], badge: str = None) -> int:
     # retrieve the publisher
     publisher: _MqPublisher = __get_publisher(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if publisher is not None:
+    # was the publisher retrieved ?
+    if publisher:
+        # yes, proceed
         result = publisher.get_state()
 
     return result
@@ -165,8 +168,9 @@ def publisher_get_state_msg(errors: list[str], badge: str = None) -> str:
     # retrieve the publisher
     publisher: _MqPublisher = __get_publisher(errors, badge)
 
-    # proceed, if the publisher was retrieved
-    if publisher is not None:
+    # was the publisher retrieved ?
+    if publisher:
+        # yes, proceed
         result = publisher.get_state_msg()
 
     return result
@@ -191,8 +195,9 @@ def publisher_publish(errors: list[str], msg_body: str | bytes, routing_key: str
     # retrieve the publisher
     publisher: _MqPublisher = __get_publisher(errors, badge)
     
-    # proceed, if the publisher was retrieved
-    if publisher is not None:
+    # was the publisher retrieved ?
+    if publisher:
+        # yes, proceed
         try:
             publisher.publish_message(errors, msg_body,
                                       f"{MQ_ROUTING_BASE}.{routing_key}", msg_mimetype, msg_headers)
@@ -214,7 +219,7 @@ def __get_publisher(errors: list[str], badge: str, must_exist: bool = True) -> _
     """
     curr_badge = badge or __DEFAULT_BADGE
     result: _MqPublisher = __publishers.get(curr_badge)
-    if must_exist and result is None:
+    if must_exist and not result:
         errors.append(f"Publisher '{curr_badge}' has not been created")
 
     return result
