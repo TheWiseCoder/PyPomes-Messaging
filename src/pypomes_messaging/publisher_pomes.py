@@ -25,33 +25,36 @@ MQ_MAX_RECONNECT_DELAY: Final[int] = env_get_int(f"{APP_PREFIX}_MQ_MAX_RECONNECT
 __publishers: dict = {}
 
 
-def publisher_create(errors: list[str], max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
-                     logger: logging.Logger = None, badge: str = None) -> bool:
+def publisher_create(errors: list[str],
+                     badge: str = None, is_daemon: bool = True,
+                     max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
+                     logger: logging.Logger = None) -> None:
     """
     Create the threaded events publisher.
 
     This is a wrapper around the package *Pika*, an implementation for a *RabbitMQ* client.
+    If a publisher with thw same bqadge already exists, it is not re-created.
 
     :param errors: incidental errors
-    :param logger: optional logger
-    :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
     :param badge: optional badge identifying the publisher
-    :return: True if the publisher was created, or False otherwise
+    :param is_daemon: whether the publisher thread is a daemon thread
+    :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
+    :param logger: optional logger
     """
-    # initialize the return variable
-    result: bool = False
-
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
 
     # has the publisher been instantiated ?
     if __get_publisher(errors, curr_badge, False) is None:
         # no, instantiate it
-        __publishers[curr_badge] = _MqPublisher(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
-                                                MQ_EXCHANGE_TYPE, max_reconnect_delay, logger)
-        __publishers[curr_badge].daemon = True
-
-    return result
+        try:
+            __publishers[curr_badge] = _MqPublisher(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
+                                                    MQ_EXCHANGE_TYPE, max_reconnect_delay, logger)
+            if is_daemon:
+                __publishers[curr_badge].daemon = True
+        except Exception as e:
+            errors.append(f"Error creating the publisher '{badge or __DEFAULT_BADGE}': "
+                          f"{exc_format(e, sys.exc_info())}")
 
 
 def publisher_destroy(badge: str = None) -> None:
@@ -177,16 +180,17 @@ def publisher_get_state_msg(errors: list[str], badge: str = None) -> str:
 
 
 def publisher_publish(errors: list[str], msg_body: str | bytes, routing_key: str,
-                      msg_mimetype: str = "application/text", msg_headers: str = None, badge: str = None) -> bool:
+                      badge: str = None, msg_mimetype: str = "application/text",
+                      msg_headers: str = None) -> bool:
     """
     Send a message to the publisher identified by *badge*, for publishing.
 
     :param errors: incidental errors
     :param msg_body: body of the message
     :param routing_key: key for message routing
+    :param badge:  optional badge identifying the publisher
     :param msg_mimetype: message mimetype (defaults to type text)
     :param msg_headers: optional message headers
-    :param badge:  optional badge identifying the publisher
     :return: True if the message was published, False otherwise
     """
     # initialize the return variable

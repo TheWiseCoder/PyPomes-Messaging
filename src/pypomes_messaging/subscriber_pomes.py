@@ -23,8 +23,9 @@ __subscribers: dict = {}
 
 
 def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
+                      badge: str = None, is_daemon: bool = True,
                       max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
-                      logger: logging.Logger = None, badge: str = None) -> bool:
+                      logger: logging.Logger = None) -> None:
     """
     Create the asynchronous subscriber.
 
@@ -33,26 +34,27 @@ def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
     :param errors: incidental errors
     :param queue_name: queue to use
     :param msg_target: the callback to reach the messager cosumer
+    :param badge: optional badge identifying the publisher
+    :param is_daemon: whether the subscriber thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
     :param logger: optional logger
-    :param badge: optional badge identifying the publisher
     :return: True if the subscriber was created, or False otherwise
     """
-    # initialize the return variable
-    result: bool = False
-
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
 
     # has the scheduler been instantiated ?
     if __get_subscriber(errors, curr_badge, False) is None:
         # no, instantiate it
-        __subscribers[curr_badge] = _MqSubscriberMaster(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
-                                                        MQ_EXCHANGE_TYPE, f"{MQ_ROUTING_BASE}.{queue_name}",
-                                                        msg_target, max_reconnect_delay, logger)
-        __subscribers[curr_badge].daemon = True
-
-    return result
+        try:
+            __subscribers[curr_badge] = _MqSubscriberMaster(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
+                                                            MQ_EXCHANGE_TYPE, f"{MQ_ROUTING_BASE}.{queue_name}",
+                                                            msg_target, max_reconnect_delay, logger)
+            if is_daemon:
+                __subscribers[curr_badge].daemon = True
+        except Exception as e:
+            errors.append(f"Error creating the subscriber '{badge or __DEFAULT_BADGE}': "
+                          f"{exc_format(e, sys.exc_info())}")
 
 
 def subscriber_destroy(badge: str = None) -> None:
@@ -133,23 +135,6 @@ def subscriber_stop(errors: list[str], badge: str = None) -> bool:
     return result
 
 
-def __get_subscriber(errors: list[str], badge: str, must_exist: bool = True) -> _MqSubscriberMaster:
-    """
-    Retrieve the subscriber identified by *badge*.
-
-    :param errors: incidental errors
-    :param badge: optional badge identifying the publisher
-    :param must_exist: True if publisher must exist
-    :return: the publisher retrieved, or None otherwise
-    """
-    curr_badge = badge or __DEFAULT_BADGE
-    result: _MqSubscriberMaster = __subscribers.get(curr_badge)
-    if must_exist and result is None:
-        errors.append(f"Subscriber '{curr_badge}' has not been created")
-
-    return result
-
-
 def subscriber_get_state(errors: list[str], badge: str = None) -> int:
     """
     Retrieve and return the current state of the subscriber identified by *badge*.
@@ -190,5 +175,22 @@ def subscriber_get_state_msg(errors: list[str], badge: str = None) -> str:
     if subscriber:
         # yes, proceed
         result = subscriber.consumer.get_state_msg()
+
+    return result
+
+
+def __get_subscriber(errors: list[str], badge: str, must_exist: bool = True) -> _MqSubscriberMaster:
+    """
+    Retrieve the subscriber identified by *badge*.
+
+    :param errors: incidental errors
+    :param badge: optional badge identifying the publisher
+    :param must_exist: True if publisher must exist
+    :return: the publisher retrieved, or None otherwise
+    """
+    curr_badge = badge or __DEFAULT_BADGE
+    result: _MqSubscriberMaster = __subscribers.get(curr_badge)
+    if must_exist and not result:
+        errors.append(f"Subscriber '{curr_badge}' has not been created")
 
     return result
