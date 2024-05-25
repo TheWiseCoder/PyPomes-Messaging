@@ -98,7 +98,7 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
                           f"{exc_format(e, sys.exc_info())}")
 
         # were there errors ?
-        if len(errors) == 0:
+        if not errors:
             # no, wait for the conclusion
             while publisher.get_state() == MQP_INITIALIZING:
                 time.sleep(0.001)
