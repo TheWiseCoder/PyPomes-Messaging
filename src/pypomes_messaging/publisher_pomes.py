@@ -108,6 +108,9 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
                 # yes, report the error
                 errors.append(f"Error starting the publisher '{badge or __DEFAULT_BADGE}': "
                               f"{publisher.get_state_msg()}")
+            else:
+                # no, report success
+                result = True
 
     return result
 

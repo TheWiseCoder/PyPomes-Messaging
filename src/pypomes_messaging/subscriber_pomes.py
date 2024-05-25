@@ -98,7 +98,7 @@ def subscriber_start(errors: list[str], badge: str = None) -> bool:
                           f"{exc_format(e, sys.exc_info())}")
 
         # any errors ?
-        if len(errors) == 0:
+        if not errors:
             # no, wait for the conclusion
             while subscriber.consumer.get_state() == MQS_INITIALIZING:
                 time.sleep(0.001)
@@ -108,6 +108,9 @@ def subscriber_start(errors: list[str], badge: str = None) -> bool:
                 # yes, report the error
                 errors.append(f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
                               f"{subscriber.consumer.get_state_msg()}")
+            else:
+                # no, report success
+                result = True
 
     return result
 

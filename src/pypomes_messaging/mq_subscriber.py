@@ -67,7 +67,7 @@ class _MqSubscriber:
         self.state: int = MQS_INITIALIZING
         self.state_msg: str = "Attenpting to initialize the subscriber"
 
-        self.conn: Connection | None = None
+        self.conn: SelectConnection | None = None
         self.channel: Channel | None = None
         self.queue_name: str = queue_name
 
@@ -87,7 +87,7 @@ class _MqSubscriber:
         self.conn = self.connect()
         self.conn.ioloop.start()
 
-    def connect(self) -> Connection:
+    def connect(self) -> SelectConnection:
         """
         Connect with *RabbitMQ*, returning the connection identifier.
 

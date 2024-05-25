@@ -3,6 +3,7 @@ import pika.frame as pika_frame
 import threading
 from logging import Logger
 from typing import Final
+from pika import SelectConnection
 from pika.channel import Channel
 from pika.connection import Connection
 from pika.exchange_type import ExchangeType
@@ -71,7 +72,7 @@ class _MqPublisher(threading.Thread):
         self.reconnect_delay: int = 0
         self.max_reconnect_delay: int = max_reconnect_delay
 
-        self.conn: Connection | None = None
+        self.conn: SelectConnection | None = None
         self.channel: Channel | None = None
 
         self.state: int = MQP_INITIALIZING
@@ -117,7 +118,7 @@ class _MqPublisher(threading.Thread):
         if self.logger:
             self.logger.info("Finished")
 
-    def connect(self) -> Connection:
+    def connect(self) -> SelectConnection:
         """
         Connect with *RabbitMQ*, and return the connection identifier.
 
@@ -134,7 +135,7 @@ class _MqPublisher(threading.Thread):
                 self.logger.info(f"Connecting with '{self.mq_url[0:first]}{self.mq_url[last:]}'")
 
         # obtain anf return the connection
-        return pika.SelectConnection(
+        return SelectConnection(
             pika.URLParameters(self.mq_url),
             on_open_callback=self.on_connection_open,
             on_open_error_callback=self.on_connection_open_error,
