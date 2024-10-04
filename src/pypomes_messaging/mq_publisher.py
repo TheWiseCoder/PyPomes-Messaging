@@ -218,7 +218,7 @@ class _MqPublisher(threading.Thread):
 
     def on_channel_closed(self, channel: Channel, reason: Exception) -> None:
         """
-        Account for *pika*'s *callback* invocation, when *RabbitMQ" unexpectedly close the channel.
+        Account for *pika*'s *callback* invocation, when *RabbitMQ* unexpectedly close the channel.
 
         Channels are usually closed when a protocol violation is attempted,
         such as redeclaring the exchange or queue with different parameters.
@@ -250,7 +250,7 @@ class _MqPublisher(threading.Thread):
 
     def on_exchange_declare_ok(self, _unused_frame: pika_frame.Method) -> None:
         """
-         Account for *pika*'s *callback* invocation, when *RabbitMQ" concludes the RPC *Exchange.Declare*.
+         Account for *pika*'s *callback* invocation, when *RabbitMQ* concludes the RPC *Exchange.Declare*.
 
         Enable delivery confirmations and schedule the first message to be sent to *RabbitMQ*.
         Send the RPC command *confirm_delivery* to *RabbitMQ* to enable delivery of confirmations on the channel.
