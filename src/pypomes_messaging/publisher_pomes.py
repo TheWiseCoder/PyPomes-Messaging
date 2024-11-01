@@ -11,11 +11,12 @@ from .mq_publisher import (
 __DEFAULT_BADGE: Final[str] = "__default__"
 
 # environment variables
-MQ_CONNECTION_URL: Final[str] = env_get_str(f"{APP_PREFIX}_MQ_CONNECTION_URL")
-MQ_EXCHANGE_NAME: Final[str] = env_get_str(f"{APP_PREFIX}_MQ_EXCHANGE_NAME")
-MQ_EXCHANGE_TYPE: Final[str] = env_get_str(f"{APP_PREFIX}_MQ_EXCHANGE_TYPE")
-MQ_ROUTING_BASE: Final[str] = env_get_str(f"{APP_PREFIX}_MQ_ROUTING_BASE")
-MQ_MAX_RECONNECT_DELAY: Final[int] = env_get_int(f"{APP_PREFIX}_MQ_MAX_RECONNECT_DELAY", 30)
+MQ_CONNECTION_URL: Final[str] = env_get_str(key=f"{APP_PREFIX}_MQ_CONNECTION_URL")
+MQ_EXCHANGE_NAME: Final[str] = env_get_str(key=f"{APP_PREFIX}_MQ_EXCHANGE_NAME")
+MQ_EXCHANGE_TYPE: Final[str] = env_get_str(key=f"{APP_PREFIX}_MQ_EXCHANGE_TYPE")
+MQ_ROUTING_BASE: Final[str] = env_get_str(key=f"{APP_PREFIX}_MQ_ROUTING_BASE")
+MQ_MAX_RECONNECT_DELAY: Final[int] = env_get_int(key=f"{APP_PREFIX}_MQ_MAX_RECONNECT_DELAY",
+                                                 def_value=30)
 
 # dict holding the publishers created:
 #   <{ <badge-1>: <publisher-instance-1>,
@@ -26,7 +27,8 @@ __publishers: dict = {}
 
 
 def publisher_create(errors: list[str],
-                     badge: str = None, is_daemon: bool = True,
+                     badge: str = None,
+                     is_daemon: bool = True,
                      max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
                      logger: logging.Logger = None) -> None:
     """
@@ -45,11 +47,16 @@ def publisher_create(errors: list[str],
     curr_badge: str = badge or __DEFAULT_BADGE
 
     # has the publisher been instantiated ?
-    if __get_publisher(errors, curr_badge, False) is None:
+    if __get_publisher(errors=errors,
+                       badge=curr_badge,
+                       must_exist=False) is None:
         # no, instantiate it
         try:
-            __publishers[curr_badge] = _MqPublisher(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
-                                                    MQ_EXCHANGE_TYPE, max_reconnect_delay, logger)
+            __publishers[curr_badge] = _MqPublisher(mq_url=MQ_CONNECTION_URL,
+                                                    exchange_name=MQ_EXCHANGE_NAME,
+                                                    exchange_type=MQ_EXCHANGE_TYPE,
+                                                    max_reconnect_delay=max_reconnect_delay,
+                                                    logger=logger)
             if is_daemon:
                 __publishers[curr_badge].daemon = True
         except Exception as e:
@@ -74,7 +81,8 @@ def publisher_destroy(badge: str = None) -> None:
         __publishers.pop(curr_badge)
 
 
-def publisher_start(errors: list[str], badge: str = None) -> bool:
+def publisher_start(errors: list[str],
+                    badge: str = None) -> bool:
     """
     Start the publisher identified by *badge*.
 
@@ -86,8 +94,8 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
     result: bool = False
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors, badge)
-
+    publisher: _MqPublisher = __get_publisher(errors=errors,
+                                              badge=badge)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
@@ -96,8 +104,7 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
         except Exception as e:
             errors.append(f"Error starting the publisher '{badge or __DEFAULT_BADGE}': "
                           f"{exc_format(e, sys.exc_info())}")
-
-        # were there errors ?
+        # errors ?
         if not errors:
             # no, wait for the conclusion
             while publisher.get_state() == MQP_INITIALIZING:
@@ -115,7 +122,8 @@ def publisher_start(errors: list[str], badge: str = None) -> bool:
     return result
 
 
-def publisher_stop(errors: list[str], badge: str = None) -> bool:
+def publisher_stop(errors: list[str],
+                   badge: str = None) -> bool:
     """
     Stop the publisher identified by *badge*.
 
@@ -127,8 +135,8 @@ def publisher_stop(errors: list[str], badge: str = None) -> bool:
     result: bool = False
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors, badge)
-
+    publisher: _MqPublisher = __get_publisher(errors=errors,
+                                              badge=badge)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
@@ -138,7 +146,8 @@ def publisher_stop(errors: list[str], badge: str = None) -> bool:
     return result
 
 
-def publisher_get_state(errors: list[str], badge: str = None) -> int:
+def publisher_get_state(errors: list[str],
+                        badge: str = None) -> int:
     """
     Retrieve and return the current state of the publisher identified by *badge*.
 
@@ -150,8 +159,8 @@ def publisher_get_state(errors: list[str], badge: str = None) -> int:
     result: int | None = None
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors, badge)
-
+    publisher: _MqPublisher = __get_publisher(errors=errors,
+                                              badge=badge)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
@@ -160,7 +169,8 @@ def publisher_get_state(errors: list[str], badge: str = None) -> int:
     return result
 
 
-def publisher_get_state_msg(errors: list[str], badge: str = None) -> str:
+def publisher_get_state_msg(errors: list[str],
+                            badge: str = None) -> str:
     """
     Retrieve and return the message associated with the current state of the publisher identified by *badge*.
 
@@ -172,8 +182,8 @@ def publisher_get_state_msg(errors: list[str], badge: str = None) -> str:
     result: str | None = None
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors, badge)
-
+    publisher: _MqPublisher = __get_publisher(errors=errors,
+                                              badge=badge)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
@@ -182,8 +192,11 @@ def publisher_get_state_msg(errors: list[str], badge: str = None) -> str:
     return result
 
 
-def publisher_publish(errors: list[str], msg_body: str | bytes, routing_key: str,
-                      badge: str = None, msg_mimetype: str = "application/text",
+def publisher_publish(errors: list[str],
+                      msg_body: str | bytes,
+                      routing_key: str,
+                      badge: str = None,
+                      msg_mimetype: str = "application/text",
                       msg_headers: str = None) -> bool:
     """
     Send a message to the publisher identified by *badge*, for publishing.
@@ -200,14 +213,17 @@ def publisher_publish(errors: list[str], msg_body: str | bytes, routing_key: str
     result: bool = False
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors, badge)
-    
+    publisher: _MqPublisher = __get_publisher(errors=errors,
+                                              badge=badge)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
         try:
-            publisher.publish_message(errors, msg_body,
-                                      f"{MQ_ROUTING_BASE}.{routing_key}", msg_mimetype, msg_headers)
+            publisher.publish_message(errors=errors,
+                                      msg_body=msg_body,
+                                      routing_key=f"{MQ_ROUTING_BASE}.{routing_key}",
+                                      msg_mimetype=msg_mimetype,
+                                      msg_headers=msg_headers)
             result = True
         except Exception as e:
             errors.append(f"Error publishing message: {exc_format(e, sys.exc_info())}")
@@ -215,7 +231,9 @@ def publisher_publish(errors: list[str], msg_body: str | bytes, routing_key: str
     return result
 
 
-def __get_publisher(errors: list[str], badge: str, must_exist: bool = True) -> _MqPublisher:
+def __get_publisher(errors: list[str],
+                    badge: str,
+                    must_exist: bool = True) -> _MqPublisher:
     """
     Retrieve the publisher identified by *badge*.
 

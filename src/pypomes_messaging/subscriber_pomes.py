@@ -1,6 +1,6 @@
-import logging
 import sys
 import time
+from logging import Logger
 from pypomes_core import exc_format
 from typing import Final
 from .publisher_pomes import (
@@ -22,10 +22,13 @@ __DEFAULT_BADGE: Final[str] = "__default__"
 __subscribers: dict = {}
 
 
-def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
-                      badge: str = None, is_daemon: bool = True,
+def subscriber_create(errors: list[str],
+                      queue_name: str,
+                      msg_target: callable,
+                      badge: str = None,
+                      is_daemon: bool = True,
                       max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
-                      logger: logging.Logger = None) -> None:
+                      logger: Logger = None) -> None:
     """
     Create the asynchronous subscriber.
 
@@ -47,9 +50,13 @@ def subscriber_create(errors: list[str], queue_name: str, msg_target: callable,
     if __get_subscriber(errors, curr_badge, False) is None:
         # no, instantiate it
         try:
-            __subscribers[curr_badge] = _MqSubscriberMaster(MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
-                                                            MQ_EXCHANGE_TYPE, f"{MQ_ROUTING_BASE}.{queue_name}",
-                                                            msg_target, max_reconnect_delay, logger)
+            __subscribers[curr_badge] = _MqSubscriberMaster(mq_url=MQ_CONNECTION_URL,
+                                                            exchange_name=MQ_EXCHANGE_NAME,
+                                                            exchange_type=MQ_EXCHANGE_TYPE,
+                                                            queue_name=f"{MQ_ROUTING_BASE}.{queue_name}",
+                                                            msg_target=msg_target,
+                                                            max_reconnect_delay=max_reconnect_delay,
+                                                            logger=logger)
             if is_daemon:
                 __subscribers[curr_badge].daemon = True
         except Exception as e:
@@ -74,7 +81,8 @@ def subscriber_destroy(badge: str = None) -> None:
         __subscribers.pop(curr_badge)
 
 
-def subscriber_start(errors: list[str], badge: str = None) -> bool:
+def subscriber_start(errors: list[str],
+                     badge: str = None) -> bool:
     """
     Start the subscriber identified by *badge*.
 
@@ -115,7 +123,8 @@ def subscriber_start(errors: list[str], badge: str = None) -> bool:
     return result
 
 
-def subscriber_stop(errors: list[str], badge: str = None) -> bool:
+def subscriber_stop(errors: list[str],
+                    badge: str = None) -> bool:
     """
     Stop the subscriber identified by *badge*.
 
@@ -138,7 +147,8 @@ def subscriber_stop(errors: list[str], badge: str = None) -> bool:
     return result
 
 
-def subscriber_get_state(errors: list[str], badge: str = None) -> int:
+def subscriber_get_state(errors: list[str],
+                         badge: str = None) -> int:
     """
     Retrieve and return the current state of the subscriber identified by *badge*.
 
@@ -160,7 +170,8 @@ def subscriber_get_state(errors: list[str], badge: str = None) -> int:
     return result
 
 
-def subscriber_get_state_msg(errors: list[str], badge: str = None) -> str:
+def subscriber_get_state_msg(errors: list[str],
+                             badge: str = None) -> str:
     """
     Retrieve and return the message associated with the current state of the subscriber identified by *badge*.
 
@@ -182,7 +193,9 @@ def subscriber_get_state_msg(errors: list[str], badge: str = None) -> str:
     return result
 
 
-def __get_subscriber(errors: list[str], badge: str, must_exist: bool = True) -> _MqSubscriberMaster:
+def __get_subscriber(errors: list[str],
+                     badge: str,
+                     must_exist: bool = True) -> _MqSubscriberMaster:
     """
     Retrieve the subscriber identified by *badge*.
 

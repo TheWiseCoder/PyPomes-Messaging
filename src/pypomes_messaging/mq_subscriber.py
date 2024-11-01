@@ -28,8 +28,13 @@ class _MqSubscriber:
     If the channel is closed, it indicates a problem with one of the commands that were issued.
     """
 
-    def __init__(self, mq_url: str, exchange_name: str, exchange_type: str,
-                 queue_name: str, msg_target: callable, logger: Logger = None) -> None:
+    def __init__(self,
+                 mq_url: str,
+                 exchange_name: str,
+                 exchange_type: str,
+                 queue_name: str,
+                 msg_target: callable,
+                 logger: Logger = None) -> None:
         """
         Create an instance of the consumer, witth the arguments needed for interacting with *RabbitMQ*.
 
@@ -65,7 +70,7 @@ class _MqSubscriber:
         self.msg_target: callable = msg_target
 
         self.state: int = MQS_INITIALIZING
-        self.state_msg: str = "Attenpting to initialize the subscriber"
+        self.state_msg: str = "Attempting to initialize the subscriber"
 
         self.conn: SelectConnection | None = None
         self.channel: Channel | None = None
@@ -75,8 +80,8 @@ class _MqSubscriber:
         self.prefetch_count: int = 1
 
         if self.logger:
-            self.logger.info("Instantiated, with exchange "
-                             f"'{exchange_name}' type '{exchange_type}', and queue '{queue_name}'")
+            self.logger.debug(msg=(f"Instantiated, with exchange '{exchange_name}', "
+                                   f"type '{exchange_type}', and queue '{queue_name}'"))
 
     def run(self) -> None:
         """
@@ -100,7 +105,8 @@ class _MqSubscriber:
             #   url: <protocol>//<user>:<password>@<ip-address>
             first: int = self.mq_url.find("//")
             last = self.mq_url.find("@")
-            self.logger.info(f"Connecting with '{self.mq_url[0:first]}{self.mq_url[last:]}'")
+            if self.logger:
+                self.logger.debug(msg=f"Connecting with '{self.mq_url[0:first]}{self.mq_url[last:]}'")
 
         # obtain and return the connection
         return SelectConnection(
@@ -109,7 +115,8 @@ class _MqSubscriber:
             on_open_error_callback=self.on_connection_open_error,
             on_close_callback=self.on_connection_closed)
 
-    def on_connection_open(self, _unused_connection: Connection) -> None:
+    def on_connection_open(self,
+                           _unused_connection: Connection) -> None:
         """
         Account for *pika*'s *callback* invocation, when the connection with *RabbitMQ* is established.
 
@@ -122,10 +129,12 @@ class _MqSubscriber:
         msg: str = f"Connection established: queue '{self.queue_name}'"
         self.state_msg = msg
         if self.logger:
-            self.logger.info(msg)
+            self.logger.debug(msg=msg)
         self.open_channel()
 
-    def on_connection_open_error(self, _unused_connection: Connection, error: str) -> None:
+    def on_connection_open_error(self,
+                                 _unused_connection: Connection,
+                                 error: str) -> None:
         """
         Account for *pika*'s *callback* invocation, if connecting with *RabbitMQ* cannot be accomplished.
 
@@ -136,10 +145,12 @@ class _MqSubscriber:
         msg: str = f"Error attempting to connect: {error}"
         self.state_msg = msg
         if self.logger:
-            self.logger.error(msg)
+            self.logger.error(msg=msg)
         self.reconnect()
 
-    def on_connection_closed(self, _unused_connection: Connection, reason: Exception) -> None:
+    def on_connection_closed(self,
+                             _unused_connection: Connection,
+                             reason: Exception) -> None:
         """
         Account for *pika*'s *callback* invocation, when a connection with *RabbitMQ* is closed unexpectedly.
 
@@ -152,7 +163,7 @@ class _MqSubscriber:
         msg: str = f"Connection was closed: {reason}"
         self.state_msg = msg
         if self.logger:
-            self.logger.warning(msg)
+            self.logger.warning(msg=msg)
         self.channel = None
 
         if self.closing:
@@ -167,13 +178,13 @@ class _MqSubscriber:
         self.consuming = False
         if self.conn.is_closing:
             if self.logger:
-                self.logger.info("Connection closing...")
+                self.logger.debug(msg="Connection closing...")
         elif self.conn.is_closed:
             if self.logger:
-                self.logger.info("Connection already closed")
+                self.logger.debug(msg="Connection already closed")
         else:
             if self.logger:
-                self.logger.info("Closing the connection")
+                self.logger.debug(msg="Closing the connection")
             self.conn.close()
 
     def reconnect(self) -> None:
@@ -193,10 +204,11 @@ class _MqSubscriber:
         will be invoked by *pika*.
         """
         if self.logger:
-            self.logger.info("Creating a new channel...")
+            self.logger.debug(msg="Creating a new channel...")
         self.conn.channel(on_open_callback=self.on_channel_open)
 
-    def on_channel_open(self, channel: Channel) -> None:
+    def on_channel_open(self,
+                        channel: Channel) -> None:
         """
         Account for *pika*'s *callback* invocation, when the channel is open.
 
@@ -206,12 +218,14 @@ class _MqSubscriber:
         :param channel: the open channel
         """
         if self.logger:
-            self.logger.info("The channel is open, the callback for its closing is established")
+            self.logger.debug(msg="The channel is open, the callback for its closing is established")
         self.channel = channel
-        self.channel.add_on_close_callback(self.on_channel_closed)
+        self.channel.add_on_close_callback(callback=self.on_channel_closed)
         self.setup_exchange()
 
-    def on_channel_closed(self, channel: Channel, reason: Exception) -> None:
+    def on_channel_closed(self,
+                          channel: Channel,
+                          reason: Exception) -> None:
         """
         Account for *pika*'s *callback* invocation, when the channel is unexpectedly closed.
 
@@ -222,7 +236,8 @@ class _MqSubscriber:
         :param channel: the closed channel
         :param reason: exception indicating the reason for the channel loss
         """
-        self.logger.warning(f"The channel '{channel}' was closed: {reason}")
+        if self.logger:
+            self.logger.warning(msg=f"The channel '{channel}' was closed: {reason}")
         self.close_connection()
 
     def setup_exchange(self) -> None:
@@ -233,21 +248,22 @@ class _MqSubscriber:
         If this setting is confirmed, *on_exchange_declare_ok* will be invoked by *pika*.
         """
         if self.logger:
-            self.logger.info(f"Declaring the exchange: '{self.exchange_name}'")
+            self.logger.debug(msg=f"Declaring the exchange '{self.exchange_name}'")
         self.channel.exchange_declare(exchange=self.exchange_name,
                                       exchange_type=self.exchange_type,
                                       passive=True,
                                       durable=True,
                                       callback=self.on_exchange_declare_ok)
 
-    def on_exchange_declare_ok(self, _unused_frame: pika_frame.Method) -> None:
+    def on_exchange_declare_ok(self,
+                               _unused_frame: pika_frame.Method) -> None:
         """
         Account for *pika*'s *callback* invocation, when *RabbitMQ* concludes the RPC *Exchange.Declare* command.
 
         :param _unused_frame: Exchange.DeclareOk response frame
         """
         if self.logger:
-            self.logger.info(f"Exchange declared: '{self.exchange_name}")
+            self.logger.debug(msg=f"Exchange '{self.exchange_name}' declared")
         self.setup_queue()
 
     def setup_queue(self) -> None:
@@ -258,13 +274,14 @@ class _MqSubscriber:
         If this setting is confirmed, *on_queue_declare_ok* will be invoked by *pika*.
         """
         if self.logger:
-            self.logger.info(f"Declaring the queue '{self.queue_name}'")
+            self.logger.debug(msg=f"Declaring the queue '{self.queue_name}'")
         self.channel.queue_declare(queue=self.queue_name,
                                    passive=True,
                                    durable=True,
                                    callback=self.on_queue_declare_ok)
 
-    def on_queue_declare_ok(self, _unused_frame: pika_frame.Method) -> None:
+    def on_queue_declare_ok(self,
+                            _unused_frame: pika_frame.Method) -> None:
         """
         Account for *pika*'s *callback* invocation, when the RPC *Queue.Declare* call in *setup_queue* is finished.
 
@@ -275,7 +292,7 @@ class _MqSubscriber:
         :param _unused_frame: the Queue.DeclareOk frame
         """
         if self.logger:
-            self.logger.info(f"Exchange '{self.exchange_name}' bound ti queue '{self.queue_name}'")
+            self.logger.debug(msg=f"Queue '{self.queue_name}' bound to exchange '{self.exchange_name}'")
         self.setup_qos()
 
     def setup_qos(self) -> None:
@@ -289,7 +306,8 @@ class _MqSubscriber:
         self.channel.basic_qos(prefetch_count=self.prefetch_count,
                                callback=self.on_basic_qos_ok)
 
-    def on_basic_qos_ok(self, _unused_frame: pika_frame.Method) -> None:
+    def on_basic_qos_ok(self,
+                        _unused_frame: pika_frame.Method) -> None:
         """
          Account for *pika*'s *callback* invocation, when the *Basic.QoS* function is concluded.
 
@@ -299,7 +317,7 @@ class _MqSubscriber:
         :param _unused_frame: the response frame Basic.QosOk
         """
         if self.logger:
-            self.logger.info(f"QOS configured to {self.prefetch_count}")
+            self.logger.debug(msg=f"QOS configured to {self.prefetch_count}")
         self.start_consuming()
 
     def start_consuming(self) -> None:
@@ -313,7 +331,7 @@ class _MqSubscriber:
         to be invoked when new messages arrive.
         """
         if self.logger:
-            self.logger.info("Adding callback for consumer cancellation")
+            self.logger.debug(msg="Adding callback for consumer cancellation")
         self.channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
         self.consumer_tag = self.channel.basic_consume(queue=self.queue_name,
@@ -327,12 +345,15 @@ class _MqSubscriber:
 
         :param method_frame: The Basic.Cancel frame
         """
-        self.logger.info(f"The consumer has been remotely cancelled, finishing: {method_frame}")
+        self.logger.debug(msg=f"The consumer has been remotely cancelled, finishing '{method_frame}'")
         if self.channel:
             self.channel.close()
 
-    def on_message(self, _unused_channel: Channel, basic_deliver: pika_spec.Basic.Deliver,
-                   properties: pika_spec.BasicProperties, msg_body: bytes) -> None:
+    def on_message(self,
+                   _unused_channel: Channel,
+                   basic_deliver: pika_spec.Basic.Deliver,
+                   properties: pika_spec.BasicProperties,
+                   msg_body: bytes) -> None:
         """
         Account for *pika*'s *callback* invocation, when a message from *RabbitMQ* is delivered.
 
@@ -347,9 +368,9 @@ class _MqSubscriber:
         :param msg_body: the body of the message
         """
         if self.logger:
-            self.logger.info(f"Msg '{basic_deliver.delivery_tag}' "
-                             f"received from '{properties.app_id}': {msg_body.decode()}")
-        self.channel.basic_ack(basic_deliver.delivery_tag)
+            self.logger.debug(msg=(f"Msg '{basic_deliver.delivery_tag}' "
+                                   f"received from '{properties.app_id}': {msg_body.decode()}"))
+        self.channel.basic_ack(delivery_tag=basic_deliver.delivery_tag)
 
         # send message to recipient
         self.msg_target(msg_body)
@@ -360,7 +381,7 @@ class _MqSubscriber:
         """
         if self.channel:
             if self.logger:
-                self.logger.info("Sending the RPC Basic.Cancel command to RabbitMQ")
+                self.logger.debug(msg="Sending the 'RPC Basic.Cancel' command to RabbitMQ")
             self.channel.basic_cancel(consumer_tag=self.consumer_tag,
                                       callback=self.on_cancel_ok)
 
@@ -375,7 +396,7 @@ class _MqSubscriber:
         """
         self.consuming = False
         if self.logger:
-            self.logger.info(f"RabbitMQ acknowledged the consumer cancellation: '{self.consumer_tag}'")
+            self.logger.debug(msg=f"RabbitMQ acknowledged the consumer cancellation: '{self.consumer_tag}'")
         self.close_channel()
 
     def close_channel(self) -> None:
@@ -383,7 +404,7 @@ class _MqSubscriber:
         Close the channel with *RabbitMQ* cleanly, by issuing the RPC *Channel.Close* command.
         """
         if self.logger:
-            self.logger.info("Closing the channel...")
+            self.logger.debug(msg="Closing the channel...")
         self.channel.close()
 
     def get_state(self) -> int:
@@ -406,6 +427,7 @@ class _MqSubscriber:
 
         :return: the state message.
         """
+        return self.state_msg
 
     def stop(self) -> None:
         """
@@ -419,14 +441,14 @@ class _MqSubscriber:
         if not self.closing:
             self.closing = True
             if self.logger:
-                self.logger.info("Stopping...")
+                self.logger.debug(msg="Stopping...")
             if self.consuming:
                 self.stop_consuming()
                 self.conn.ioloop.start()
             else:
                 self.conn.ioloop.stop()
             if self.logger:
-                self.logger.info("Stopped")
+                self.logger.debug(msg="Stopped")
 
 
 class _MqSubscriberMaster(threading.Thread):
@@ -436,8 +458,13 @@ class _MqSubscriberMaster(threading.Thread):
     This reconnection is carried out if the consumer indicates that reconnecting is necessary.
     """
 
-    def __init__(self, mq_url: str, exchange_name: str, exchange_type: str, queue_name: str,
-                 msg_target: callable, max_reconnect_delay: int, logger: Logger = None) -> None:
+    def __init__(self, mq_url: str,
+                 exchange_name: str,
+                 exchange_type: str,
+                 queue_name: str,
+                 msg_target: callable,
+                 max_reconnect_delay: int,
+                 logger: Logger = None) -> None:
 
         threading.Thread.__init__(self)
 
@@ -453,8 +480,12 @@ class _MqSubscriberMaster(threading.Thread):
         self.stopped: bool = False
 
         # instantiate the consumer
-        self.consumer: _MqSubscriber = _MqSubscriber(self.mq_url, self.exchange_name, self.exchange_type,
-                                                     self.queue_name, self.msg_target, self.logger)
+        self.consumer: _MqSubscriber = _MqSubscriber(mq_url=self.mq_url,
+                                                     exchange_name=self.exchange_name,
+                                                     exchange_type=self.exchange_type,
+                                                     queue_name=self.queue_name,
+                                                     msg_target=self.msg_target,
+                                                     logger=self.logger)
 
     def run(self) -> None:
         """
@@ -488,13 +519,16 @@ class _MqSubscriberMaster(threading.Thread):
         if result:
             reconnect_delay = self.__get_reconnect_delay()
             if self.logger:
-                self.logger.info(f"Reconnecting in {reconnect_delay} seconds")
+                self.logger.debug(msg=f"Reconnecting in {reconnect_delay} seconds")
             time.sleep(reconnect_delay)
 
             # create a new consumer instance
-            self.consumer = _MqSubscriber(self.mq_url, self.exchange_name, self.exchange_type,
-                                          self.queue_name, self.msg_target, self.logger)
-
+            self.consumer = _MqSubscriber(mq_url=self.mq_url,
+                                          exchange_name=self.exchange_name,
+                                          exchange_type=self.exchange_type,
+                                          queue_name=self.queue_name,
+                                          msg_target=self.msg_target,
+                                          logger=self.logger)
         return result
 
     def __get_reconnect_delay(self) -> int:

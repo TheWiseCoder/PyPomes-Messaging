@@ -31,8 +31,12 @@ class _MqPublisher(threading.Thread):
     on message delivery, and verify if such deliveries were confirme by *RabbitMQ*.
     """
 
-    def __init__(self, mq_url: str, exchange_name: str, exchange_type: str,
-                 max_reconnect_delay: int, logger: Logger = None) -> None:
+    def __init__(self,
+                 mq_url: str,
+                 exchange_name: str,
+                 exchange_type: str,
+                 max_reconnect_delay: int,
+                 logger: Logger = None) -> None:
         """
         Create a new instance of the publisher, with the arguments to allow it to interact with *RabbitMQ*.
 
@@ -92,8 +96,8 @@ class _MqPublisher(threading.Thread):
         self.msg_lock: threading.Lock = threading.Lock()
 
         if self.logger:
-            self.logger.info("Publisher instantiated, with exchange "
-                             f"'{exchange_name}' of type '{exchange_type}'")
+            self.logger.debug(msg=("Publisher instantiated, with exchange "
+                                   f"'{exchange_name}' of type '{exchange_type}'"))
 
     # ponto de entrada para a thread
     def run(self) -> None:
@@ -103,7 +107,7 @@ class _MqPublisher(threading.Thread):
         # stay in the loop, until 'stop()' is invoked
         while not self.stopped:
             if self.logger:
-                self.logger.info("Started")
+                self.logger.debug(msg="Started")
             self.messages = {}
             self.acked = 0
             self.nacked = 0
@@ -116,7 +120,7 @@ class _MqPublisher(threading.Thread):
             self.conn.ioloop.start()
 
         if self.logger:
-            self.logger.info("Finished")
+            self.logger.debug("Finished")
 
     def connect(self) -> SelectConnection:
         """
@@ -132,7 +136,7 @@ class _MqPublisher(threading.Thread):
             first: int = self.mq_url.find("//")
             last = self.mq_url.find("@")
             if self.logger:
-                self.logger.info(f"Connecting with '{self.mq_url[0:first]}{self.mq_url[last:]}'")
+                self.logger.debug(msg=f"Connecting with '{self.mq_url[0:first]}{self.mq_url[last:]}'")
 
         # obtain anf return the connection
         return SelectConnection(
@@ -141,7 +145,8 @@ class _MqPublisher(threading.Thread):
             on_open_error_callback=self.on_connection_open_error,
             on_close_callback=self.on_connection_closed)
 
-    def on_connection_open(self, _connection: Connection) -> None:
+    def on_connection_open(self,
+                           _connection: Connection) -> None:
         """
         Account for *pika*'s *callback* invocation, when the connection with *RabbitMQ* is established.
 
@@ -152,10 +157,12 @@ class _MqPublisher(threading.Thread):
         self.state = MQP_CONNECTION_OPEN
         self.state_msg = "Connection was open"
         if self.logger:
-            self.logger.info(self.state_msg)
+            self.logger.debug(self.state_msg)
         self.open_channel()
 
-    def on_connection_open_error(self, _connection: Connection, error: Exception) -> None:
+    def on_connection_open_error(self,
+                                 _connection: Connection,
+                                 error: Exception) -> None:
         """
          Account for *pika*'s *callback* invocation, if the connection with *RabbitMQ* could not be established.
 
@@ -167,10 +174,13 @@ class _MqPublisher(threading.Thread):
         delay: int = self.__get_reconnect_delay()
         if self.logger:
             self.logger.error(self.state_msg)
-            self.logger.info(f"Reconnecting in {delay} seconds")
-        self.conn.ioloop.call_later(delay, self.conn.ioloop.stop)
+            self.logger.debug(msg=f"Reconnecting in {delay} seconds")
+        self.conn.ioloop.call_later(delay=delay,
+                                    callback=self.conn.ioloop.stop)
 
-    def on_connection_closed(self, _connection: Connection, reason: Exception) -> None:
+    def on_connection_closed(self,
+                             _connection: Connection,
+                             reason: Exception) -> None:
         """
         Account for *pika*'s *callback* invocation, when the connection with *RabbitMQ* is closed unexpectedly.
 
@@ -187,9 +197,10 @@ class _MqPublisher(threading.Thread):
         else:
             delay: int = self.__get_reconnect_delay()
             if self.logger:
-                self.logger.warning(self.state_msg)
-                self.logger.info(f"Reconnecting in {delay} seconds")
-            self.conn.ioloop.call_later(delay, self.conn.ioloop.stop)
+                self.logger.warning(msg=self.state_msg)
+                self.logger.debug(msg=f"Reconnecting in {delay} seconds")
+            self.conn.ioloop.call_later(delay=delay,
+                                        callback=self.conn.ioloop.stop)
 
     def open_channel(self) -> None:
         """
@@ -198,10 +209,11 @@ class _MqPublisher(threading.Thread):
         When the channel open response from *RabbitMQ* is received, the indicated *callback* is invoked by *pika*.
         """
         if self.logger:
-            self.logger.info("Criando um novo canal")
+            self.logger.debug(msg="Creating a new channel")
         self.conn.channel(on_open_callback=self.on_channel_open)
 
-    def on_channel_open(self, channel: Channel) -> None:
+    def on_channel_open(self,
+                        channel: Channel) -> None:
         """
          Account for *pika*'s *callback* invocation, when the channel is open.
 
@@ -211,12 +223,14 @@ class _MqPublisher(threading.Thread):
         :param channel: O canal que foi aberto
         """
         if self.logger:
-            self.logger.info("The channel is open. Establishing thew callback for channel closing")
+            self.logger.debug(msg="The channel is open, establishing the callback for channel closing")
         self.channel = channel
-        self.channel.add_on_close_callback(self.on_channel_closed)
+        self.channel.add_on_close_callback(callback=self.on_channel_closed)
         self.setup_exchange()
 
-    def on_channel_closed(self, channel: Channel, reason: Exception) -> None:
+    def on_channel_closed(self,
+                          channel: Channel,
+                          reason: Exception) -> None:
         """
         Account for *pika*'s *callback* invocation, when *RabbitMQ* unexpectedly close the channel.
 
@@ -228,7 +242,7 @@ class _MqPublisher(threading.Thread):
         :param reason: the reason for closing the channel
         """
         if self.logger:
-            self.logger.warning(f"O canal '{channel}' foi fechado: {reason}")
+            self.logger.warning(msg=f"The channel '{channel}' has been closed: {reason}")
         self.channel = None
         if not self.stopped and not self.conn.is_closed and not self.conn.is_closing:
             self.conn.close()
@@ -241,14 +255,15 @@ class _MqPublisher(threading.Thread):
          If this configuraation is confirmed, *on_exchange_declare_ok* will be invoked by *pika*.
         """
         if self.logger:
-            self.logger.info(f"Declarando o comutador: '{self.exchange_name}'")
+            self.logger.debug(msg=f"Declaring the exchange '{self.exchange_name}'")
         self.channel.exchange_declare(exchange=self.exchange_name,
                                       exchange_type=self.exchange_type,
                                       passive=True,
                                       durable=True,
                                       callback=self.on_exchange_declare_ok)
 
-    def on_exchange_declare_ok(self, _unused_frame: pika_frame.Method) -> None:
+    def on_exchange_declare_ok(self,
+                               _unused_frame: pika_frame.Method) -> None:
         """
          Account for *pika*'s *callback* invocation, when *RabbitMQ* concludes the RPC *Exchange.Declare*.
 
@@ -262,11 +277,12 @@ class _MqPublisher(threading.Thread):
         :param _unused_frame: Exchange.DeclareOk response frame
         """
         if self.logger:
-            self.logger.info(f"Comutador declarado: '{self.exchange_name}', pronto para publicação.")
+            self.logger.debug(msg=f"Exchange '{self.exchange_name}' declared, ready for publishing")
         self.channel.confirm_delivery(ack_nack_callback=self.on_delivery_confirmation)
         self.started_publishing = True
 
-    def on_delivery_confirmation(self, method_frame: pika_frame.Method) -> None:
+    def on_delivery_confirmation(self,
+                                 method_frame: pika_frame.Method) -> None:
         """
         Account for *pika*'s *callback* invocation, when *RabbitMQ* responds to a RPC *Basic.Publish* command.
 
@@ -285,8 +301,8 @@ class _MqPublisher(threading.Thread):
         delivery_tag: int = method_frame.method.delivery_tag
 
         if self.logger:
-            self.logger.info(f"Recebida confirmação de entrega: etiqueta '{delivery_tag}', "
-                             f"tipo '{confirmation_type}', múltiplo: {ack_multiple}")
+            self.logger.debug(msg=(f"Delivery confirmation received: tag '{delivery_tag}', "
+                                   f"type '{confirmation_type}', multiple: {ack_multiple}"))
 
         if confirmation_type == "ack":
             self.acked += 1
@@ -310,9 +326,9 @@ class _MqPublisher(threading.Thread):
                     self.messages.pop(msg_tag)
 
             if self.logger:
-                self.logger.info(f"Mensagens: publicadas {self.msg_last_sent}, "
-                                 f"a serem confirmadas {len(self.messages)}, "
-                                 f"bem sucedidas {self.acked}, mal sucedidas {self.nacked}")
+                self.logger.debug(msg=(f"Messages: published {self.msg_last_sent}, "
+                                       f"to be confirmed {len(self.messages)}, "
+                                       f"successful {self.acked}, unsuccessful {self.nacked}"))
 
     def send_message(self) -> None:
         """
@@ -321,9 +337,9 @@ class _MqPublisher(threading.Thread):
         This is done by adding the message data to the *messages* object. This object is used to verify
         the delivery confirmation in *on_delivery_confirmation*.
         """
-        # o canal existe e está aberto ?
+        # is there an open channel ?
         if self.channel is not None and self.channel.is_open:
-            # sim, prossiga
+            # yes, proceed
             self.msg_last_sent += 1
 
             with self.msg_lock:
@@ -340,14 +356,17 @@ class _MqPublisher(threading.Thread):
                                        body=msg_body,
                                        properties=properties)
             if self.logger:
-                self.logger.info(f"Msg '{self.msg_last_sent}' publicada, chave '{routing_key}'")
+                self.logger.debug(msg=f"Msg '{self.msg_last_sent}' published, key '{routing_key}'")
         elif self.logger:
-            # não, reporte o erro
-            self.logger.error("Não é possível publicar: "
-                              "não há canal aberto com o servidor de mensagens")
+            # no, report the error
+            self.logger.error(msg="Publishing is not possible: no open channel with the server")
 
-    def publish_message(self, errors: list[str], msg_body: str | bytes, routing_key: str,
-                        msg_mimetype: str = "application/text", msg_headers: str = None) -> None:
+    def publish_message(self,
+                        errors: list[str],
+                        msg_body: str | bytes,
+                        routing_key: str,
+                        msg_mimetype: str = "application/text",
+                        msg_headers: str = None) -> None:
         """
         Publish a message in *RabbitMQ*, unless the publisher is stopping.
 
@@ -355,29 +374,33 @@ class _MqPublisher(threading.Thread):
         *RabbitMQ* is told to invoke *send_message* in *publish_interval* seconds.
         The delivery intervals may be accelerated or decelerated, by changing this variable.
         """
-        # does the channel exist and is open ?
+        # is there an open channel ?
         if self.channel is not None and self.channel.is_open:
             # yes, proceed
             msg_bytes: bytes = msg_body if isinstance(msg_body, bytes) else msg_body.encode()
             self.msg_last_filed += 1
 
             with self.msg_lock:
-                self.messages[self.msg_last_filed] = {"headers": msg_headers,
-                                                      "body": msg_bytes,
-                                                      "mimetype": msg_mimetype,
-                                                      "routing_key": routing_key}
+                self.messages[self.msg_last_filed] = {
+                    "headers": msg_headers,
+                    "body": msg_bytes,
+                    "mimetype": msg_mimetype,
+                    "routing_key": routing_key
+                }
 
             # schedule message delivery to happen in 'publish_interval' seconds
-            self.conn.ioloop.call_later(self.publish_interval, self.send_message)
+            self.conn.ioloop.call_later(delay=self.publish_interval,
+                                        callback=self.send_message)
             if self.logger:
-                self.logger.info(f"Msg '{self.msg_last_filed}' scheduled for publication in "
-                                 f"{self.publish_interval}s, routing key '{routing_key}': {msg_bytes.decode()}")
+                self.logger.debug(msg=(f"Msg '{self.msg_last_filed}' scheduled for publication in "
+                                       f"{self.publish_interval} secs,"
+                                       f" routing key '{routing_key}': {msg_bytes.decode()}"))
         else:
             # no, report the error
-            errmsg: str = "Messagen refused: no open channel to the message server exists"
+            errmsg: str = "Messages refused: no open channel to the server exists"
             errors.append(errmsg)
             if self.logger:
-                self.logger.error(errmsg)
+                self.logger.error(msg=errmsg)
 
     def get_state(self) -> int:
         """
@@ -407,27 +430,27 @@ class _MqPublisher(threading.Thread):
         A flag is turned on, to signal the need for interrupting the scheduling of new messages publication.
         """
         if self.logger:
-            self.logger.info("Finishing...")
+            self.logger.debug("Finishing...")
         self.stopped = True
         self.close_channel()
         self.close_connection()
 
     def close_channel(self) -> None:
         """
-        Fecha o canal com *RabbitMQ*, enviando o comando RPC *Channel.Close*.
+        Close channel with *RabbitMQ*, by sending the RPC command *Channel.Close*.
         """
         if self.channel:
             if self.logger:
-                self.logger.info("Closing the channel...")
+                self.logger.debug("Closing the channel...")
             self.channel.close()
 
     def close_connection(self) -> None:
         """
-        Fecha a cconexão com o RabbitMQ.
+        Close the connection with *RabbitMQ*.
         """
         if self.conn:
             if self.logger:
-                self.logger.info("Closing the connection...")
+                self.logger.debug("Closing the connection...")
             self.conn.close()
 
     def __get_reconnect_delay(self) -> int:
