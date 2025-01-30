@@ -45,20 +45,19 @@ class _MqSubscriber:
         :param msg_target: callback for message deliveries
         :param logger: optional logger
         """
-        exch_type:  ExchangeType
-        match exchange_type:
-            case "direct":
-                exch_type = ExchangeType.direct
-            case "fanout":
-                exch_type = ExchangeType.fanout
-            case "headers":
-                exch_type = ExchangeType.headers
-            case _:  # 'topic'
-                exch_type = ExchangeType.topic
-
         # initialize instance attributes
         self.exchange_name = exchange_name
-        self.exchange_type: ExchangeType = exch_type
+
+        self.exchange_type: str
+        match exchange_type:
+            case "direct":
+                self.exchange_type = ExchangeType.direct.value
+            case "fanout":
+                self.exchange_type = ExchangeType.fanout.value
+            case "headers":
+                self.exchange_type = ExchangeType.headers.value
+            case _:  # 'topic'
+                self.exchange_type = ExchangeType.topic.value
 
         self.should_reconnect: bool = False
         self.started_consumption: bool = False

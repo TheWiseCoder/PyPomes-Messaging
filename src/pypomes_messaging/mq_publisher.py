@@ -2,12 +2,13 @@ import pika
 import pika.frame as pika_frame
 import threading
 from logging import Logger
-from typing import Final
 from pika import SelectConnection
 from pika.channel import Channel
 from pika.connection import Connection
 from pika.exchange_type import ExchangeType
 from pika.spec import BasicProperties
+from pypomes_core import Mimetype
+from typing import Final
 
 MQP_CONNECTION_OPEN: Final[int] = 1
 MQP_CONNECTION_CLOSED: Final[int] = 2
@@ -48,20 +49,19 @@ class _MqPublisher(threading.Thread):
         """
         threading.Thread.__init__(self)
 
-        exch_type: ExchangeType | str
-        match exchange_type:
-            case "direct":
-                exch_type = ExchangeType.direct
-            case "fanout":
-                exch_type = ExchangeType.fanout
-            case "headers":
-                exch_type = ExchangeType.headers
-            case _:  # 'topic'
-                exch_type = ExchangeType.topic
-
         # initialize instance attributes
         self.exchange_name: str = exchange_name
-        self.exchange_type: ExchangeType = exch_type
+
+        self.exchange_type: str
+        match exchange_type:
+            case "direct":
+                self.exchange_type = ExchangeType.direct.value
+            case "fanout":
+                self.exchange_type = ExchangeType.fanout.value
+            case "headers":
+                self.exchange_type = ExchangeType.headers.value
+            case _:  # 'topic'
+                self.exchange_type = ExchangeType.topic.value
 
         self.started_publishing: bool = False
         self.mq_url: str = mq_url
@@ -84,8 +84,8 @@ class _MqPublisher(threading.Thread):
 
         # structure ('n' is the sequential message number, int > 0):
         # <{ n: { "header": <str>,
-        #        "body":  <bytes>,    # noqa: ERA001
-        #        "mimetype": <str>,   # noqa: ERA001
+        #        "body":  <bytes>,
+        #        "mimetype": <str>,
         #        "routing_key": <str>
         #      },...
         # }>
@@ -365,7 +365,7 @@ class _MqPublisher(threading.Thread):
                         errors: list[str],
                         msg_body: str | bytes,
                         routing_key: str,
-                        msg_mimetype: str = "application/text",
+                        msg_mimetype: Mimetype = Mimetype.TEXT,
                         msg_headers: str = None) -> None:
         """
         Publish a message in *RabbitMQ*, unless the publisher is stopping.
@@ -384,7 +384,7 @@ class _MqPublisher(threading.Thread):
                 self.messages[self.msg_last_filed] = {
                     "headers": msg_headers,
                     "body": msg_bytes,
-                    "mimetype": msg_mimetype,
+                    "mimetype": msg_mimetype.value,
                     "routing_key": routing_key
                 }
 

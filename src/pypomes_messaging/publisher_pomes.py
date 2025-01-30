@@ -2,7 +2,10 @@ import logging
 import time
 import sys
 from typing import Final
-from pypomes_core import APP_PREFIX, env_get_str, env_get_int, exc_format
+from pypomes_core import (
+    APP_PREFIX, Mimetype,
+    env_get_str, env_get_int, exc_format
+)
 from .mq_publisher import (
     MQP_CONNECTION_ERROR, MQP_INITIALIZING,
     _MqPublisher
@@ -196,7 +199,7 @@ def publisher_publish(errors: list[str],
                       msg_body: str | bytes,
                       routing_key: str,
                       badge: str = None,
-                      msg_mimetype: str = "application/text",
+                      msg_mimetype: Mimetype = Mimetype.TEXT,
                       msg_headers: str = None) -> bool:
     """
     Send a message to the publisher identified by *badge*, for publishing.
