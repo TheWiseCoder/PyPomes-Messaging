@@ -1,7 +1,6 @@
 import time
 import threading
 from logging import Logger
-from typing import Final
 from pika import frame as pika_frame
 from pika import spec as pika_spec
 from pika import SelectConnection, URLParameters
@@ -9,10 +8,7 @@ from pika.channel import Channel
 from pika.connection import Connection
 from pika.exchange_type import ExchangeType
 
-MQS_CONNECTION_OPEN: Final[int] = 1
-MQS_CONNECTION_CLOSED: Final[int] = 2
-MQS_CONNECTION_ERROR: Final[int] = -1
-MQS_INITIALIZING: Final[int] = 0
+from .mq_config import MqState
 
 
 class _MqSubscriber:
@@ -68,7 +64,7 @@ class _MqSubscriber:
         self.mq_url: str = mq_url
         self.msg_target: callable = msg_target
 
-        self.state: int = MQS_INITIALIZING
+        self.state: int = MqState.INITIALIZING
         self.state_msg: str = "Attempting to initialize the subscriber"
 
         self.conn: SelectConnection | None = None
@@ -124,7 +120,7 @@ class _MqSubscriber:
 
         :param _unused_connection: the connection with RabbitMQ
         """
-        self.state = MQS_CONNECTION_OPEN
+        self.state = MqState.CONNECTION_OPEN
         msg: str = f"Connection established: queue '{self.queue_name}'"
         self.state_msg = msg
         if self.logger:
@@ -140,7 +136,7 @@ class _MqSubscriber:
         :param _unused_connection: the attempted connection with RabbitMQ
         :param error: the associated error message
         """
-        self.state = MQS_CONNECTION_ERROR
+        self.state = MqState.CONNECTION_ERROR
         msg: str = f"Error attempting to connect: {error}"
         self.state_msg = msg
         if self.logger:
@@ -158,7 +154,7 @@ class _MqSubscriber:
         :param _unused_connection: the closed connection
         :param reason: exception indicating the reason for the connection loss
         """
-        self.state = MQS_CONNECTION_CLOSED
+        self.state = MqState.CONNECTION_CLOSED
         msg: str = f"Connection was closed: {reason}"
         self.state_msg = msg
         if self.logger:

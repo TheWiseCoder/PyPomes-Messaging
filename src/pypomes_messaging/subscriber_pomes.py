@@ -3,14 +3,9 @@ import time
 from logging import Logger
 from pypomes_core import exc_format
 from typing import Final
-from .publisher_pomes import (
-    MQ_CONNECTION_URL, MQ_EXCHANGE_NAME,
-    MQ_EXCHANGE_TYPE, MQ_ROUTING_BASE, MQ_MAX_RECONNECT_DELAY
-)
-from .mq_subscriber import (
-    MQS_CONNECTION_ERROR, MQS_INITIALIZING,
-    _MqSubscriberMaster
-)
+
+from .mq_config import MqConfig, MqState
+from .mq_subscriber import _MqSubscriberMaster
 
 __DEFAULT_BADGE: Final[str] = "__default__"
 
@@ -22,12 +17,12 @@ __DEFAULT_BADGE: Final[str] = "__default__"
 __subscribers: dict = {}
 
 
-def subscriber_create(errors: list[str],
+def subscriber_create(errors: list[str] | None,
                       queue_name: str,
                       msg_target: callable,
                       badge: str = None,
                       is_daemon: bool = True,
-                      max_reconnect_delay: int = MQ_MAX_RECONNECT_DELAY,
+                      max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
                       logger: Logger = None) -> None:
     """
     Create the asynchronous subscriber.
@@ -46,22 +41,28 @@ def subscriber_create(errors: list[str],
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
 
-    # has the scheduler been instantiated ?
-    if __get_subscriber(errors, curr_badge, False) is None:
+    # has the subscriber been instantiated ?
+    if __get_subscriber(errors=errors,
+                        badge=curr_badge,
+                        must_exist=False) is None:
         # no, instantiate it
         try:
-            __subscribers[curr_badge] = _MqSubscriberMaster(mq_url=MQ_CONNECTION_URL,
-                                                            exchange_name=MQ_EXCHANGE_NAME,
-                                                            exchange_type=MQ_EXCHANGE_TYPE,
-                                                            queue_name=f"{MQ_ROUTING_BASE}.{queue_name}",
+            __subscribers[curr_badge] = _MqSubscriberMaster(mq_url=MqConfig.CONNECTION_URL,
+                                                            exchange_name=MqConfig.EXCHANGE_NAME,
+                                                            exchange_type=MqConfig.EXCHANGE_TYPE,
+                                                            queue_name=f"{MqConfig.ROUTING_BASE}.{queue_name}",
                                                             msg_target=msg_target,
                                                             max_reconnect_delay=max_reconnect_delay,
                                                             logger=logger)
             if is_daemon:
                 __subscribers[curr_badge].daemon = True
         except Exception as e:
-            errors.append(f"Error creating the subscriber '{badge or __DEFAULT_BADGE}': "
-                          f"{exc_format(e, sys.exc_info())}")
+            msg: str = (f"Error creating the subscriber '{badge or __DEFAULT_BADGE}': "
+                        f"{exc_format(e, sys.exc_info())}")
+            if isinstance(errors, list):
+                errors.append(msg)
+            if logger:
+                logger.error(msg=msg)
 
 
 def subscriber_destroy(badge: str = None) -> None:
@@ -74,7 +75,7 @@ def subscriber_destroy(badge: str = None) -> None:
     curr_badge: str = badge or __DEFAULT_BADGE
     subscriber: _MqSubscriberMaster = __subscribers.get(curr_badge)
 
-    # does the subscriber exist ?
+    # does it exist ?
     if subscriber:
         # yes, stop and discard it
         subscriber.stop()
@@ -93,29 +94,39 @@ def subscriber_start(errors: list[str],
     # initialize the return variable
     result: bool = False
 
-    # retrieve the publisher
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
-
-    # was the subscriber retrieved ?
+    # retrieve the subscriber
+    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
+                                                       badge=badge)
+    # was it retrieved ?
     if subscriber:
-        # yoes, proceed
+        # yes, proceed
+        started: bool = False
         try:
             subscriber.start()
+            started = True
         except Exception as e:
-            errors.append(f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
-                          f"{exc_format(e, sys.exc_info())}")
+            msg: str = (f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
+                        f"{exc_format(e, sys.exc_info())}")
+            if isinstance(errors, list):
+                errors.append(msg)
+            if subscriber.logger:
+                subscriber.logger.error(msg=msg)
 
-        # any errors ?
-        if not errors:
+        # was it started ?
+        if not started:
             # no, wait for the conclusion
-            while subscriber.consumer.get_state() == MQS_INITIALIZING:
+            while subscriber.consumer.get_state() == MqState.INITIALIZING:
                 time.sleep(0.001)
 
             # did connecting with the subscriber fail ?
-            if subscriber.consumer.get_state() == MQS_CONNECTION_ERROR:
+            if subscriber.consumer.get_state() == MqState.CONNECTION_ERROR:
                 # yes, report the error
-                errors.append(f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
-                              f"{subscriber.consumer.get_state_msg()}")
+                msg: str = (f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
+                            f"{subscriber.consumer.get_state_msg()}")
+                if isinstance(errors, list):
+                    errors.append(msg)
+                if subscriber.logger:
+                    subscriber.logger.error(msg=msg)
             else:
                 # no, report success
                 result = True
@@ -136,9 +147,9 @@ def subscriber_stop(errors: list[str],
     result: bool = False
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
-
-    # was the publisher retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
+                                                       badge=badge)
+    # was it retrieved ?
     if subscriber:
         # yes, proceed
         subscriber.stop()
@@ -160,9 +171,9 @@ def subscriber_get_state(errors: list[str],
     result: int | None = None
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
-
-    # was the subscriber retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
+                                                       badge=badge)
+    # was it retrieved ?
     if subscriber:
         # yes, proceed
         result = subscriber.consumer.get_state()
@@ -183,9 +194,9 @@ def subscriber_get_state_msg(errors: list[str],
     result: str | None = None
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors, badge)
-
-    # was the subscriber retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
+                                                       badge=badge)
+    # was it retrieved ?
     if subscriber:
         # yes, proceed
         result = subscriber.consumer.get_state_msg()
@@ -206,7 +217,7 @@ def __get_subscriber(errors: list[str],
     """
     curr_badge = badge or __DEFAULT_BADGE
     result: _MqSubscriberMaster = __subscribers.get(curr_badge)
-    if must_exist and not result:
+    if must_exist and not result and isinstance(errors, list):
         errors.append(f"Subscriber '{curr_badge}' has not been created")
 
     return result

@@ -8,12 +8,8 @@ from pika.connection import Connection
 from pika.exchange_type import ExchangeType
 from pika.spec import BasicProperties
 from pypomes_core import Mimetype
-from typing import Final
 
-MQP_CONNECTION_OPEN: Final[int] = 1
-MQP_CONNECTION_CLOSED: Final[int] = 2
-MQP_CONNECTION_ERROR: Final[int] = -1
-MQP_INITIALIZING: Final[int] = 0
+from .mq_config import MqState
 
 
 class _MqPublisher(threading.Thread):
@@ -79,7 +75,7 @@ class _MqPublisher(threading.Thread):
         self.conn: SelectConnection | None = None
         self.channel: Channel | None = None
 
-        self.state: int = MQP_INITIALIZING
+        self.state: int = MqState.INITIALIZING
         self.state_msg: str = "Attenpting to instantiate the publisher"
 
         # structure ('n' is the sequential message number, int > 0):
@@ -154,7 +150,7 @@ class _MqPublisher(threading.Thread):
 
         :param _connection: the connection with RabbitMQ
         """
-        self.state = MQP_CONNECTION_OPEN
+        self.state = MqState.CONNECTION_OPEN
         self.state_msg = "Connection was open"
         if self.logger:
             self.logger.debug(self.state_msg)
@@ -169,7 +165,7 @@ class _MqPublisher(threading.Thread):
         :param _connection: the attempted connection RabbitMQ
         :param error: the corresponding error message
         """
-        self.state = MQP_CONNECTION_ERROR
+        self.state = MqState.CONNECTION_ERROR
         self.state_msg = f"Error establishing connection: {error}"
         delay: int = self.__get_reconnect_delay()
         if self.logger:
@@ -189,7 +185,7 @@ class _MqPublisher(threading.Thread):
         :param _connection: the closed connection
         :param reason: exception indicating the reason for the connection loss
         """
-        self.state = MQP_CONNECTION_CLOSED
+        self.state = MqState.CONNECTION_CLOSED
         self.state_msg = f"Connection was closed: {reason}"
         self.channel = None
         if self.stopped:
@@ -384,7 +380,7 @@ class _MqPublisher(threading.Thread):
                 self.messages[self.msg_last_filed] = {
                     "headers": msg_headers,
                     "body": msg_bytes,
-                    "mimetype": msg_mimetype.value,
+                    "mimetype": msg_mimetype,
                     "routing_key": routing_key
                 }
 
