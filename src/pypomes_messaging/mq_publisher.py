@@ -8,6 +8,7 @@ from pika.connection import Connection
 from pika.exchange_type import ExchangeType
 from pika.spec import BasicProperties
 from pypomes_core import Mimetype
+from pypomes_logging import PYPOMES_LOGGER
 
 from .mq_config import MqState
 
@@ -33,7 +34,7 @@ class _MqPublisher(threading.Thread):
                  exchange_name: str,
                  exchange_type: str,
                  max_reconnect_delay: int,
-                 logger: Logger = None) -> None:
+                 logger: Logger = PYPOMES_LOGGER) -> None:
         """
         Create a new instance of the publisher, with the arguments to allow it to interact with *RabbitMQ*.
 

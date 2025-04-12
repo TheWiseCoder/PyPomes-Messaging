@@ -2,6 +2,7 @@ import sys
 import time
 from logging import Logger
 from pypomes_core import exc_format
+from pypomes_logging import PYPOMES_LOGGER
 from typing import Final
 
 from .mq_config import MqConfig, MqState
@@ -23,7 +24,7 @@ def subscriber_create(errors: list[str] | None,
                       badge: str = None,
                       is_daemon: bool = True,
                       max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
-                      logger: Logger = None) -> None:
+                      logger: Logger = PYPOMES_LOGGER) -> None:
     """
     Create the asynchronous subscriber.
 
