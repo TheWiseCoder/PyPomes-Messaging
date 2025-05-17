@@ -1,3 +1,4 @@
+import pika
 from enum import IntEnum, StrEnum
 from pypomes_core import APP_PREFIX, env_get_str
 
@@ -27,3 +28,12 @@ class MqState(IntEnum):
     CONNECTION_ERROR = -1
     INITIALIZING = 0
 
+
+def mq_get_version() -> str:
+    """
+    Obtain and return the MQ wngine's current version.
+
+    :return: the MQ engine's current version
+    """
+    # noinspection PyUnresolvedReferences
+    return pika.__version__

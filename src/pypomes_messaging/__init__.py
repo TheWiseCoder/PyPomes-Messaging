@@ -1,4 +1,6 @@
-from .mq_config import MqConfig, MqState
+from .mq_config import (
+    MqConfig, MqState, mq_get_version
+)
 from .publisher_pomes import (
     publisher_create, publisher_destroy, publisher_start, publisher_stop,
     publisher_get_state, publisher_get_state_msg, publisher_get_params, publisher_publish
@@ -10,7 +12,7 @@ from .subscriber_pomes import (
 
 __all__ = [
     # mq_config
-    "MqConfig", "MqState",
+    "MqConfig", "MqState", "mq_get_version",
     # publisher_pomes
     "publisher_create", "publisher_destroy", "publisher_start", "publisher_stop",
     "publisher_get_state", "publisher_get_state_msg", "publisher_get_params", "publisher_publish",

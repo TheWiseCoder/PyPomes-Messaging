@@ -7,7 +7,6 @@ from pika import SelectConnection, URLParameters
 from pika.channel import Channel
 from pika.connection import Connection
 from pika.exchange_type import ExchangeType
-from pypomes_logging import PYPOMES_LOGGER
 
 from .mq_config import MqState
 
@@ -31,7 +30,7 @@ class _MqSubscriber:
                  exchange_type: str,
                  queue_name: str,
                  msg_target: callable,
-                 logger: Logger = PYPOMES_LOGGER) -> None:
+                 logger: Logger = None) -> None:
         """
         Create an instance of the consumer, witth the arguments needed for interacting with *RabbitMQ*.
 
@@ -460,7 +459,7 @@ class _MqSubscriberMaster(threading.Thread):
                  queue_name: str,
                  msg_target: callable,
                  max_reconnect_delay: int,
-                 logger: Logger = PYPOMES_LOGGER) -> None:
+                 logger: Logger = None) -> None:
 
         threading.Thread.__init__(self)
 
