@@ -18,10 +18,10 @@ __DEFAULT_BADGE: Final[str] = "__default__"
 __publishers: dict = {}
 
 
-def publisher_create(errors: list[str] | None,
-                     badge: str = None,
+def publisher_create(badge: str = None,
                      is_daemon: bool = True,
                      max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
+                     errors: list[str] = None,
                      logger: Logger = None) -> None:
     """
     Create the threaded events publisher.
@@ -29,19 +29,19 @@ def publisher_create(errors: list[str] | None,
     This is a wrapper around the package *Pika*, an implementation for a *RabbitMQ* client.
     If a publisher with thw same bqadge already exists, it is not re-created.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
     :param is_daemon: whether the publisher thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
+    :param errors: incidental errors
     :param logger: optional logger
     """
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
 
     # has the publisher been instantiated ?
-    if __get_publisher(errors=errors,
-                       badge=curr_badge,
-                       must_exist=False) is None:
+    if __get_publisher(badge=curr_badge,
+                       must_exist=False,
+                       errors=errors) is None:
         # no, instantiate it
         try:
             __publishers[curr_badge] = _MqPublisher(mq_url=MqConfig.CONNECTION_URL,
@@ -77,22 +77,20 @@ def publisher_destroy(badge: str = None) -> None:
         __publishers.pop(curr_badge)
 
 
-def publisher_start(errors: list[str] | None,
-                    badge: str = None) -> bool:
+def publisher_start(badge: str = None,
+                    errors: list[str] = None) -> bool:
     """
     Start the publisher identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
+    :param errors: incidental errors
     :return: True if the publisher has been started, False otherwise
     """
     # initialize the return variable
     result: bool = False
 
-    # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=errors,
-                                              badge=badge)
-    # was it retrieved ?
+    publisher: _MqPublisher = __get_publisher(badge=badge,
+                                              errors=errors)
     if publisher:
         # yes, proceed
         started: bool = False
@@ -128,45 +126,43 @@ def publisher_start(errors: list[str] | None,
     return result
 
 
-def publisher_stop(errors: list[str] | None,
-                   badge: str = None) -> bool:
+def publisher_stop(badge: str = None,
+                   errors: list[str] = None) -> bool:
     """
     Stop the publisher identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
+    :param errors: incidental errors
     :return: True if the publisher has been stopped, False otherwise
     """
     # initialize the return variable
     result: bool = False
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=errors,
-                                              badge=badge)
-    # was it retrieved ?
+    publisher: _MqPublisher = __get_publisher(badge=badge,
+                                              errors=errors)
     if publisher:
-        # yes, proceed
         publisher.stop()
         result = True
 
     return result
 
 
-def publisher_get_state(errors: list[str] | None,
-                        badge: str = None) -> int:
+def publisher_get_state(badge: str = None,
+                        errors: list[str] = None) -> int:
     """
-    Retrieve and return the current state of the publisher identified by *badge*.
+    Retrieve the current state of the publisher identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
+    :param errors: incidental errors
     :return: the current state of the publisher
     """
     # initialize the return variable
     result: int | None = None
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=errors,
-                                              badge=badge)
+    publisher: _MqPublisher = __get_publisher(badge=badge,
+                                              errors=errors)
     # was the publisher retrieved ?
     if publisher:
         # yes, proceed
@@ -175,24 +171,22 @@ def publisher_get_state(errors: list[str] | None,
     return result
 
 
-def publisher_get_state_msg(errors: list[str] | None,
-                            badge: str = None) -> str:
+def publisher_get_state_msg(badge: str = None,
+                            errors: list[str] = None) -> str:
     """
-    Retrieve and return the message associated with the current state of the publisher identified by *badge*.
+    Retrieve the message associated with the current state of the publisher identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
+    :param errors: incidental errors
     :return: the message associated with the current state of the publisher
     """
     # initialize the return variable
     result: str | None = None
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=errors,
-                                              badge=badge)
-    # was the publisher retrieved ?
+    publisher: _MqPublisher = __get_publisher(badge=badge,
+                                              errors=errors)
     if publisher:
-        # yes, proceed
         result = publisher.get_state_msg()
 
     return result
@@ -200,7 +194,7 @@ def publisher_get_state_msg(errors: list[str] | None,
 
 def publisher_get_params(badge: str = None) -> dict[str, Any]:
     """
-    Retrieve and return the parameters used to instantiate the publisher.
+    Retrieve the parameters used to instantiate the publisher.
 
     :param badge: optional badge identifying the publisher
     :return: the parameters used to instantiate the publisher, or *None* on error
@@ -209,8 +203,7 @@ def publisher_get_params(badge: str = None) -> dict[str, Any]:
     result: dict[str, Any] | None = None
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=None,
-                                              badge=badge)
+    publisher: _MqPublisher = __get_publisher(badge=badge)
     if publisher:
         result = {
             "url": publisher.mq_url,
@@ -222,32 +215,30 @@ def publisher_get_params(badge: str = None) -> dict[str, Any]:
     return result
 
 
-def publisher_publish(errors: list[str] | None,
-                      msg_body: str | bytes,
+def publisher_publish(msg_body: str | bytes,
                       routing_key: str,
                       badge: str = None,
                       msg_mimetype: Mimetype = Mimetype.TEXT,
-                      msg_headers: str = None) -> bool:
+                      msg_headers: str = None,
+                      errors: list[str] = None) -> bool:
     """
     Send a message to the publisher identified by *badge*, for publishing.
 
-    :param errors: incidental errors
     :param msg_body: body of the message
     :param routing_key: key for message routing
     :param badge:  optional badge identifying the publisher
     :param msg_mimetype: message mimetype (defaults to type text)
     :param msg_headers: optional message headers
+    :param errors: incidental errors
     :return: *True* if the message was published, *False* otherwise
     """
     # initialize the return variable
     result: bool = False
 
     # retrieve the publisher
-    publisher: _MqPublisher = __get_publisher(errors=errors,
-                                              badge=badge)
-    # was the publisher retrieved ?
+    publisher: _MqPublisher = __get_publisher(badge=badge,
+                                              errors=errors)
     if publisher:
-        # yes, proceed
         try:
             publisher.publish_message(errors=errors,
                                       msg_body=msg_body,
@@ -265,15 +256,15 @@ def publisher_publish(errors: list[str] | None,
     return result
 
 
-def __get_publisher(errors: list[str] | None,
-                    badge: str,
-                    must_exist: bool = True) -> _MqPublisher:
+def __get_publisher(badge: str,
+                    must_exist: bool = True,
+                    errors: list[str] = None) -> _MqPublisher:
     """
     Retrieve the publisher identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
     :param must_exist: True if publisher must exist
+    :param errors: incidental errors
     :return: the publisher retrieved, or *None* otherwise
     """
     curr_badge = badge or __DEFAULT_BADGE

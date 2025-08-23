@@ -358,11 +358,11 @@ class _MqPublisher(threading.Thread):
             self.logger.error(msg="Publishing is not possible: no open channel with the server")
 
     def publish_message(self,
-                        errors: list[str],
                         msg_body: str | bytes,
                         routing_key: str,
                         msg_mimetype: Mimetype = Mimetype.TEXT,
-                        msg_headers: str = None) -> None:
+                        msg_headers: str = None,
+                        errors: list[str] = None) -> None:
         """
         Publish a message in *RabbitMQ*, unless the publisher is stopping.
 
@@ -394,7 +394,8 @@ class _MqPublisher(threading.Thread):
         else:
             # no, report the error
             errmsg: str = "Messages refused: no open channel to the server exists"
-            errors.append(errmsg)
+            if isinstance(errors, list):
+                errors.append(errmsg)
             if self.logger:
                 self.logger.error(msg=errmsg)
 

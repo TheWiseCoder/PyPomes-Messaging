@@ -17,24 +17,24 @@ __DEFAULT_BADGE: Final[str] = "__default__"
 __subscribers: dict = {}
 
 
-def subscriber_create(errors: list[str] | None,
-                      queue_name: str,
+def subscriber_create(queue_name: str,
                       msg_target: callable,
                       badge: str = None,
                       is_daemon: bool = True,
                       max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
+                      errors: list[str] = None,
                       logger: Logger = None) -> None:
     """
     Create the asynchronous subscriber.
 
     This is a wrapper around the package *Pika*, an implementation for a *RabbitMQ* client.
 
-    :param errors: incidental errors
     :param queue_name: queue to use
     :param msg_target: the callback to reach the messager cosumer
     :param badge: optional badge identifying the publisher
     :param is_daemon: whether the subscriber thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
+    :param errors: incidental errors
     :param logger: optional logger
     :return: True if the subscriber was created, or False otherwise
     """
@@ -42,9 +42,9 @@ def subscriber_create(errors: list[str] | None,
     curr_badge: str = badge or __DEFAULT_BADGE
 
     # has the subscriber been instantiated ?
-    if __get_subscriber(errors=errors,
-                        badge=curr_badge,
-                        must_exist=False) is None:
+    if __get_subscriber(badge=curr_badge,
+                        must_exist=False,
+                        errors=errors) is None:
         # no, instantiate it
         try:
             __subscribers[curr_badge] = _MqSubscriberMaster(mq_url=MqConfig.CONNECTION_URL,
@@ -82,24 +82,22 @@ def subscriber_destroy(badge: str = None) -> None:
         __subscribers.pop(curr_badge)
 
 
-def subscriber_start(errors: list[str],
-                     badge: str = None) -> bool:
+def subscriber_start(badge: str = None,
+                     errors: list[str] = None) -> bool:
     """
     Start the subscriber identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
+    :param errors: incidental errors
     :return: True if the publisher has been started, False otherwise
     """
     # initialize the return variable
     result: bool = False
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
-                                                       badge=badge)
-    # was it retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(badge=badge,
+                                                       errors=errors)
     if subscriber:
-        # yes, proceed
         started: bool = False
         try:
             subscriber.start()
@@ -134,48 +132,44 @@ def subscriber_start(errors: list[str],
     return result
 
 
-def subscriber_stop(errors: list[str],
-                    badge: str = None) -> bool:
+def subscriber_stop(badge: str = None,
+                    errors: list[str] = None) -> bool:
     """
     Stop the subscriber identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the subscriber
+    :param errors: incidental errors
     :return: True if the subscriber has been stopped, False otherwise
     """
     # initialize the return variable
     result: bool = False
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
-                                                       badge=badge)
-    # was it retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(badge=badge,
+                                                       errors=errors)
     if subscriber:
-        # yes, proceed
         subscriber.stop()
         result = True
 
     return result
 
 
-def subscriber_get_state(errors: list[str],
-                         badge: str = None) -> int:
+def subscriber_get_state(badge: str = None,
+                         errors: list[str] = None) -> int:
     """
-    Retrieve and return the current state of the subscriber identified by *badge*.
+    Retrieve the current state of the subscriber identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the subscriber
+    :param errors: incidental errors
     :return: the current state of the subscriber
     """
     # initialize the return variable
     result: int | None = None
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
-                                                       badge=badge)
-    # was it retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(badge=badge,
+                                                       errors=errors)
     if subscriber:
-        # yes, proceed
         result = subscriber.consumer.get_state()
 
     return result
@@ -184,35 +178,33 @@ def subscriber_get_state(errors: list[str],
 def subscriber_get_state_msg(errors: list[str],
                              badge: str = None) -> str:
     """
-    Retrieve and return the message associated with the current state of the subscriber identified by *badge*.
+    Retrieve the message associated with the current state of the subscriber identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the subscriber
+    :param errors: incidental errors
     :return: the message associated with the current state of the subscriber
     """
     # initialize the return variable
     result: str | None = None
 
     # retrieve the subscriber
-    subscriber: _MqSubscriberMaster = __get_subscriber(errors=errors,
-                                                       badge=badge)
-    # was it retrieved ?
+    subscriber: _MqSubscriberMaster = __get_subscriber(badge=badge,
+                                                       errors=errors)
     if subscriber:
-        # yes, proceed
         result = subscriber.consumer.get_state_msg()
 
     return result
 
 
-def __get_subscriber(errors: list[str],
-                     badge: str,
-                     must_exist: bool = True) -> _MqSubscriberMaster:
+def __get_subscriber(badge: str,
+                     must_exist: bool = True,
+                     errors: list[str] = None) -> _MqSubscriberMaster:
     """
     Retrieve the subscriber identified by *badge*.
 
-    :param errors: incidental errors
     :param badge: optional badge identifying the publisher
     :param must_exist: True if publisher must exist
+    :param errors: incidental errors
     :return: the publisher retrieved, or None otherwise
     """
     curr_badge = badge or __DEFAULT_BADGE
