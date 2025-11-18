@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "pika>=1.3.2",
-    "pypomes_core>=2.7.0"
+    "pypomes_core>=2.7.8"
 ]
 
 [project.urls]
