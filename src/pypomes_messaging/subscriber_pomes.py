@@ -1,5 +1,6 @@
 import sys
 import time
+from collections.abc import Callable
 from logging import Logger
 from pypomes_core import exc_format
 from typing import Final
@@ -18,7 +19,7 @@ __subscribers: dict = {}
 
 
 def subscriber_create(queue_name: str,
-                      msg_target: callable,
+                      msg_target: Callable,
                       badge: str = None,
                       is_daemon: bool = True,
                       max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),

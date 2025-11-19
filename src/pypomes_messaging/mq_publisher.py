@@ -8,6 +8,7 @@ from pika.connection import Connection
 from pika.exchange_type import ExchangeType
 from pika.spec import BasicProperties
 from pypomes_core import Mimetype
+from typing import Any
 
 from .mq_config import MqState
 
@@ -51,13 +52,13 @@ class _MqPublisher(threading.Thread):
         self.exchange_type: str
         match exchange_type:
             case "direct":
-                self.exchange_type = ExchangeType.direct.value
+                self.exchange_type = str(ExchangeType.direct.value)
             case "fanout":
-                self.exchange_type = ExchangeType.fanout.value
+                self.exchange_type = str(ExchangeType.fanout.value)
             case "headers":
-                self.exchange_type = ExchangeType.headers.value
+                self.exchange_type = str(ExchangeType.headers.value)
             case _:  # 'topic'
-                self.exchange_type = ExchangeType.topic.value
+                self.exchange_type = str(ExchangeType.topic.value)
 
         self.started_publishing: bool = False
         self.mq_url: str = mq_url
@@ -339,14 +340,14 @@ class _MqPublisher(threading.Thread):
             self.msg_last_sent += 1
 
             with self.msg_lock:
-                message: dict = self.messages[self.msg_last_sent]
+                message: dict[str, Any] = self.messages[self.msg_last_sent]
 
             properties: BasicProperties = pika.BasicProperties(app_id="mq-publisher",
-                                                               content_type=message["mimetype"],
-                                                               headers=message["headers"])
+                                                               content_type=message.get("mimetype"),
+                                                               headers=message.get("headers"))
             routing_key: str = message.get("routing_key")
 
-            msg_body: bytes = message["body"]
+            msg_body: bytes = message.get("body")
             self.channel.basic_publish(exchange=self.exchange_name,
                                        routing_key=routing_key,
                                        body=msg_body,

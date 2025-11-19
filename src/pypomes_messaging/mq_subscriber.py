@@ -1,5 +1,6 @@
 import time
 import threading
+from collections.abc import Callable
 from logging import Logger
 from pika import frame as pika_frame
 from pika import spec as pika_spec
@@ -29,7 +30,7 @@ class _MqSubscriber:
                  exchange_name: str,
                  exchange_type: str,
                  queue_name: str,
-                 msg_target: callable,
+                 msg_target: Callable,
                  logger: Logger = None) -> None:
         """
         Create an instance of the consumer, witth the arguments needed for interacting with *RabbitMQ*.
@@ -47,13 +48,13 @@ class _MqSubscriber:
         self.exchange_type: str
         match exchange_type:
             case "direct":
-                self.exchange_type = ExchangeType.direct.value
+                self.exchange_type = str(ExchangeType.direct.value)
             case "fanout":
-                self.exchange_type = ExchangeType.fanout.value
+                self.exchange_type = str(ExchangeType.fanout.value)
             case "headers":
-                self.exchange_type = ExchangeType.headers.value
+                self.exchange_type = str(ExchangeType.headers.value)
             case _:  # 'topic'
-                self.exchange_type = ExchangeType.topic.value
+                self.exchange_type = str(ExchangeType.topic.value)
 
         self.should_reconnect: bool = False
         self.started_consumption: bool = False
@@ -457,7 +458,7 @@ class _MqSubscriberMaster(threading.Thread):
                  exchange_name: str,
                  exchange_type: str,
                  queue_name: str,
-                 msg_target: callable,
+                 msg_target: Callable,
                  max_reconnect_delay: int,
                  logger: Logger = None) -> None:
 
@@ -465,7 +466,7 @@ class _MqSubscriberMaster(threading.Thread):
 
         # initialize instance attributes
         self.mq_url: str = mq_url
-        self.msg_target: callable = msg_target
+        self.msg_target: Callable = msg_target
         self.queue_name: str = queue_name
         self.exchange_name = exchange_name
         self.exchange_type: str = exchange_type
