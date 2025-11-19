@@ -63,7 +63,7 @@ class _MqSubscriber:
         self.consuming: bool = False
         self.consumer_tag: str | None = None
         self.mq_url: str = mq_url
-        self.msg_target: callable = msg_target
+        self.msg_target: Callable = msg_target
 
         self.state: int = MqState.INITIALIZING
         self.state_msg: str = "Attempting to initialize the subscriber"
