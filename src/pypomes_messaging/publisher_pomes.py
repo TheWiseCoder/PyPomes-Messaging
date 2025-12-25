@@ -1,6 +1,5 @@
 import time
 import sys
-from logging import Logger
 from pypomes_core import Mimetype, exc_format
 from typing import Any, Final
 
@@ -21,8 +20,7 @@ __publishers: dict = {}
 def publisher_create(badge: str = None,
                      is_daemon: bool = True,
                      max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
-                     errors: list[str] = None,
-                     logger: Logger = None) -> None:
+                     errors: list[str] = None) -> None:
     """
     Create the threaded events publisher.
 
@@ -33,7 +31,6 @@ def publisher_create(badge: str = None,
     :param is_daemon: whether the publisher thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
     :param errors: incidental errors
-    :param logger: optional logger
     """
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
@@ -47,8 +44,7 @@ def publisher_create(badge: str = None,
             __publishers[curr_badge] = _MqPublisher(mq_url=MqConfig.CONNECTION_URL,
                                                     exchange_name=MqConfig.EXCHANGE_NAME,
                                                     exchange_type=MqConfig.EXCHANGE_TYPE,
-                                                    max_reconnect_delay=max_reconnect_delay,
-                                                    logger=logger)
+                                                    max_reconnect_delay=max_reconnect_delay)
             if is_daemon:
                 __publishers[curr_badge].daemon = True
         except Exception as e:
@@ -56,8 +52,8 @@ def publisher_create(badge: str = None,
                         f"{exc_format(e, sys.exc_info())}")
             if isinstance(errors, list):
                 errors.append(msg)
-            if logger:
-                logger.error(msg=msg)
+            if _MqPublisher.LOGGER:
+                _MqPublisher.LOGGER.error(msg=msg)
 
 
 def publisher_destroy(badge: str = None) -> None:
@@ -102,8 +98,8 @@ def publisher_start(badge: str = None,
                         f"{exc_format(e, sys.exc_info())}")
             if isinstance(errors, list):
                 errors.append(msg)
-            if publisher.logger:
-                publisher.logger.error(msg=msg)
+            if _MqPublisher.LOGGER:
+                _MqPublisher.LOGGER.error(msg=msg)
         # was it started ?
         if not started:
             # no, wait for the conclusion
@@ -117,8 +113,8 @@ def publisher_start(badge: str = None,
                             f"{publisher.get_state_msg()}")
                 if isinstance(errors, list):
                     errors.append(msg)
-                if publisher.logger:
-                    publisher.logger.error(msg=msg)
+                if _MqPublisher.LOGGER:
+                    _MqPublisher.LOGGER.error(msg=msg)
             else:
                 # no, report success
                 result = True
@@ -250,8 +246,8 @@ def publisher_publish(msg_body: str | bytes,
             msg: str = f"Error publishing message: {exc_format(e, sys.exc_info())}"
             if isinstance(errors, list):
                 errors.append(msg)
-            if publisher.logger:
-                publisher.logger.error(msg=msg)
+            if _MqPublisher.LOGGER:
+                _MqPublisher.LOGGER.error(msg=msg)
 
     return result
 

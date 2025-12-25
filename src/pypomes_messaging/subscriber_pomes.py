@@ -1,12 +1,11 @@
 import sys
 import time
 from collections.abc import Callable
-from logging import Logger
 from pypomes_core import exc_format
 from typing import Final
 
 from .mq_config import MqConfig, MqState
-from .mq_subscriber import _MqSubscriberMaster
+from .mq_subscriber import _MqSubscriber, _MqSubscriberMaster
 
 __DEFAULT_BADGE: Final[str] = "__default__"
 
@@ -23,8 +22,7 @@ def subscriber_create(queue_name: str,
                       badge: str = None,
                       is_daemon: bool = True,
                       max_reconnect_delay: int = int(MqConfig.MAX_RECONNECT_DELAY),
-                      errors: list[str] = None,
-                      logger: Logger = None) -> None:
+                      errors: list[str] = None) -> None:
     """
     Create the asynchronous subscriber.
 
@@ -36,7 +34,6 @@ def subscriber_create(queue_name: str,
     :param is_daemon: whether the subscriber thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
     :param errors: incidental errors
-    :param logger: optional logger
     :return: True if the subscriber was created, or False otherwise
     """
     # define the badge
@@ -53,8 +50,7 @@ def subscriber_create(queue_name: str,
                                                             exchange_type=MqConfig.EXCHANGE_TYPE,
                                                             queue_name=f"{MqConfig.ROUTING_BASE}.{queue_name}",
                                                             msg_target=msg_target,
-                                                            max_reconnect_delay=max_reconnect_delay,
-                                                            logger=logger)
+                                                            max_reconnect_delay=max_reconnect_delay)
             if is_daemon:
                 __subscribers[curr_badge].daemon = True
         except Exception as e:
@@ -62,8 +58,8 @@ def subscriber_create(queue_name: str,
                         f"{exc_format(e, sys.exc_info())}")
             if isinstance(errors, list):
                 errors.append(msg)
-            if logger:
-                logger.error(msg=msg)
+            if _MqSubscriber.LOGGER:
+                _MqSubscriber.LOGGER.error(msg=msg)
 
 
 def subscriber_destroy(badge: str = None) -> None:
@@ -104,12 +100,12 @@ def subscriber_start(badge: str = None,
             subscriber.start()
             started = True
         except Exception as e:
-            msg: str = (f"Error starting the subscriber '{badge or __DEFAULT_BADGE}': "
-                        f"{exc_format(e, sys.exc_info())}")
+            msg: str = (f"Error starting the subscriber "
+                        f"'{badge or __DEFAULT_BADGE}': {exc_format(e, sys.exc_info())}")
             if isinstance(errors, list):
                 errors.append(msg)
-            if subscriber.logger:
-                subscriber.logger.error(msg=msg)
+            if _MqSubscriber.LOGGER:
+                _MqSubscriber.LOGGER.error(msg=msg)
 
         # was it started ?
         if not started:
@@ -124,8 +120,8 @@ def subscriber_start(badge: str = None,
                             f"{subscriber.consumer.get_state_msg()}")
                 if isinstance(errors, list):
                     errors.append(msg)
-                if subscriber.logger:
-                    subscriber.logger.error(msg=msg)
+                if _MqSubscriber.LOGGER:
+                    _MqSubscriber.LOGGER.error(msg=msg)
             else:
                 # no, report success
                 result = True
