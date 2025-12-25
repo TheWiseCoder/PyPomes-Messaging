@@ -1,5 +1,6 @@
 import time
 import sys
+from logging import Logger
 from pypomes_core import Mimetype, exc_format
 from typing import Any, Final
 
@@ -30,7 +31,7 @@ def publisher_create(badge: str = None,
     :param badge: optional badge identifying the publisher
     :param is_daemon: whether the publisher thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     """
     # define the badge
     curr_badge: str = badge or __DEFAULT_BADGE
@@ -79,7 +80,7 @@ def publisher_start(badge: str = None,
     Start the publisher identified by *badge*.
 
     :param badge: optional badge identifying the publisher
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: True if the publisher has been started, False otherwise
     """
     # initialize the return variable
@@ -128,7 +129,7 @@ def publisher_stop(badge: str = None,
     Stop the publisher identified by *badge*.
 
     :param badge: optional badge identifying the publisher
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: True if the publisher has been stopped, False otherwise
     """
     # initialize the return variable
@@ -150,7 +151,7 @@ def publisher_get_state(badge: str = None,
     Retrieve the current state of the publisher identified by *badge*.
 
     :param badge: optional badge identifying the publisher
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the current state of the publisher
     """
     # initialize the return variable
@@ -173,7 +174,7 @@ def publisher_get_state_msg(badge: str = None,
     Retrieve the message associated with the current state of the publisher identified by *badge*.
 
     :param badge: optional badge identifying the publisher
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the message associated with the current state of the publisher
     """
     # initialize the return variable
@@ -222,10 +223,10 @@ def publisher_publish(msg_body: str | bytes,
 
     :param msg_body: body of the message
     :param routing_key: key for message routing
-    :param badge:  optional badge identifying the publisher
+    :param badge: optional badge identifying the publisher
     :param msg_mimetype: message mimetype (defaults to type text)
     :param msg_headers: optional message headers
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: *True* if the message was published, *False* otherwise
     """
     # initialize the return variable
@@ -252,6 +253,15 @@ def publisher_publish(msg_body: str | bytes,
     return result
 
 
+def publisher_set_logger(logger: Logger) -> None:
+    """
+    Establish the publisher class logger.
+
+    :param logger: the publisher class logger
+    """
+    _MqPublisher.LOGGER = logger
+
+
 def __get_publisher(badge: str,
                     must_exist: bool = True,
                     errors: list[str] = None) -> _MqPublisher:
@@ -260,7 +270,7 @@ def __get_publisher(badge: str,
 
     :param badge: optional badge identifying the publisher
     :param must_exist: True if publisher must exist
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the publisher retrieved, or *None* otherwise
     """
     curr_badge = badge or __DEFAULT_BADGE

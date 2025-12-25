@@ -373,6 +373,12 @@ class _MqPublisher(threading.Thread):
         This is the interface for external requests for message publishing.
         *RabbitMQ* is told to invoke *send_message* in *publish_interval* seconds.
         The delivery intervals may be accelerated or decelerated, by changing this variable.
+
+        :param msg_body: body of the message
+        :param routing_key: key for message routing
+        :param msg_mimetype: message mimetype (defaults to type text)
+        :param msg_headers: optional message headers
+        :param errors: incidental errors (might be a non-empty list)
         """
         # is there an open channel ?
         if self.channel is not None and self.channel.is_open:

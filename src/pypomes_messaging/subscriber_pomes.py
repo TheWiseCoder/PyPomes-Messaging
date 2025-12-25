@@ -1,6 +1,7 @@
 import sys
 import time
 from collections.abc import Callable
+from logging import Logger
 from pypomes_core import exc_format
 from typing import Final
 
@@ -33,7 +34,7 @@ def subscriber_create(queue_name: str,
     :param badge: optional badge identifying the publisher
     :param is_daemon: whether the subscriber thread is a daemon thread
     :param max_reconnect_delay: maximum delay for re-establishing lost connections, in seconds
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: True if the subscriber was created, or False otherwise
     """
     # define the badge
@@ -85,7 +86,7 @@ def subscriber_start(badge: str = None,
     Start the subscriber identified by *badge*.
 
     :param badge: optional badge identifying the publisher
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: True if the publisher has been started, False otherwise
     """
     # initialize the return variable
@@ -107,9 +108,8 @@ def subscriber_start(badge: str = None,
             if _MqSubscriber.LOGGER:
                 _MqSubscriber.LOGGER.error(msg=msg)
 
-        # was it started ?
         if not started:
-            # no, wait for the conclusion
+            # wait for the conclusion
             while subscriber.consumer.get_state() == MqState.INITIALIZING:
                 time.sleep(0.001)
 
@@ -135,7 +135,7 @@ def subscriber_stop(badge: str = None,
     Stop the subscriber identified by *badge*.
 
     :param badge: optional badge identifying the subscriber
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: True if the subscriber has been stopped, False otherwise
     """
     # initialize the return variable
@@ -157,7 +157,7 @@ def subscriber_get_state(badge: str = None,
     Retrieve the current state of the subscriber identified by *badge*.
 
     :param badge: optional badge identifying the subscriber
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the current state of the subscriber
     """
     # initialize the return variable
@@ -178,7 +178,7 @@ def subscriber_get_state_msg(errors: list[str],
     Retrieve the message associated with the current state of the subscriber identified by *badge*.
 
     :param badge: optional badge identifying the subscriber
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the message associated with the current state of the subscriber
     """
     # initialize the return variable
@@ -193,6 +193,15 @@ def subscriber_get_state_msg(errors: list[str],
     return result
 
 
+def subscriber_set_logger(logger: Logger) -> None:
+    """
+    Establish the subscriber class logger.
+
+    :param logger: the subscriber class logger
+    """
+    _MqSubscriber.LOGGER = logger
+
+
 def __get_subscriber(badge: str,
                      must_exist: bool = True,
                      errors: list[str] = None) -> _MqSubscriberMaster:
@@ -201,7 +210,7 @@ def __get_subscriber(badge: str,
 
     :param badge: optional badge identifying the publisher
     :param must_exist: True if publisher must exist
-    :param errors: incidental errors
+    :param errors: incidental errors (might be a non-empty list)
     :return: the publisher retrieved, or None otherwise
     """
     curr_badge = badge or __DEFAULT_BADGE
